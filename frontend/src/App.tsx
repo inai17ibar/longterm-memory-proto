@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react'
-import { Send, User, Brain, Trash2, Info } from 'lucide-react'
+import { Send, User, Brain, Trash2, Info, Download } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
@@ -19,6 +19,12 @@ interface UserInfo {
   hobbies?: string[]
   job?: string
   other_info?: Record<string, any>
+  memory_items?: Array<{
+    type: string
+    content: string
+    timestamp: string
+    source: string
+  }>
 }
 
 function App() {
@@ -28,6 +34,7 @@ function App() {
   const [userId, setUserId] = useState<string>('')
   const [userInfo, setUserInfo] = useState<UserInfo | null>(null)
   const [error, setError] = useState<string>('')
+  const [isExporting, setIsExporting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
   const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
@@ -135,6 +142,32 @@ function App() {
       setUserId(newUserId)
     } catch (error) {
       setError('データの削除に失敗しました。')
+    }
+  }
+
+  const exportConversations = async () => {
+    setIsExporting(true)
+    try {
+      const response = await fetch(`${API_URL}/api/export-conversations/${userId}`)
+      if (response.ok) {
+        const data = await response.json()
+        
+        const blob = new Blob([data.csv_data], { type: 'text/csv' })
+        const url = window.URL.createObjectURL(blob)
+        const a = document.createElement('a')
+        a.href = url
+        a.download = data.filename
+        document.body.appendChild(a)
+        a.click()
+        window.URL.revokeObjectURL(url)
+        document.body.removeChild(a)
+      } else {
+        setError('会話履歴のエクスポートに失敗しました')
+      }
+    } catch (error) {
+      setError('エクスポート中にエラーが発生しました')
+    } finally {
+      setIsExporting(false)
     }
   }
 
@@ -336,10 +369,16 @@ function App() {
                             <p className="text-sm">{userInfo.other_info.family}</p>
                           </div>
                         )}
-                        {userInfo.other_info.concerns && (
+                        {userInfo.memory_items && userInfo.memory_items.filter(item => item.type === 'concerns').length > 0 && (
                           <div>
                             <span className="text-sm font-medium text-gray-600">悩み・心配事:</span>
-                            <p className="text-sm text-orange-700">{userInfo.other_info.concerns}</p>
+                            <div className="space-y-1 mt-1">
+                              {userInfo.memory_items
+                                .filter(item => item.type === 'concerns')
+                                .map((item, index) => (
+                                  <p key={index} className="text-sm text-orange-700">• {item.content}</p>
+                                ))}
+                            </div>
                           </div>
                         )}
                         {userInfo.other_info.goals && (
@@ -388,10 +427,20 @@ function App() {
                   onClick={clearConversation}
                   variant="destructive"
                   size="sm"
-                  className="w-full flex items-center gap-2"
+                  className="w-full flex items-center gap-2 mb-2"
                 >
                   <Trash2 className="w-4 h-4" />
                   会話履歴を削除
+                </Button>
+                <Button 
+                  onClick={exportConversations}
+                  variant="outline"
+                  size="sm"
+                  disabled={isExporting}
+                  className="w-full flex items-center gap-2"
+                >
+                  <Download className="w-4 h-4" />
+                  {isExporting ? 'エクスポート中...' : '会話履歴をCSVでダウンロード'}
                 </Button>
                 <p className="text-xs text-gray-500 mt-2">
                   ユーザーID: {userId.slice(-8)}...

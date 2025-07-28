@@ -8,6 +8,8 @@ from dotenv import load_dotenv
 import json
 from datetime import datetime
 import uuid
+import csv
+from io import StringIO
 
 load_dotenv()
 
@@ -33,6 +35,7 @@ class UserInfo(BaseModel):
     hobbies: Optional[List[str]] = None
     job: Optional[str] = None
     other_info: Optional[Dict[str, Any]] = None
+    memory_items: Optional[List[Dict[str, Any]]] = None
 
 class ChatMessage(BaseModel):
     user_id: str
@@ -75,7 +78,8 @@ async def create_or_update_user(user_info: UserInfo):
         name=user_memory[user_info.user_id]["name"],
         hobbies=user_memory[user_info.user_id]["hobbies"],
         job=user_memory[user_info.user_id]["job"],
-        other_info=user_memory[user_info.user_id]["other_info"]
+        other_info=user_memory[user_info.user_id]["other_info"],
+        memory_items=user_memory[user_info.user_id]["memory_items"]
     )
 
 @app.get("/api/users/{user_id}", response_model=UserInfo)
@@ -90,7 +94,8 @@ async def get_user(user_id: str):
         name=user_data["name"],
         hobbies=user_data["hobbies"],
         job=user_data["job"],
-        other_info=user_data["other_info"]
+        other_info=user_data["other_info"],
+        memory_items=user_data["memory_items"]
     )
 
 @app.post("/api/chat", response_model=ChatResponse)
@@ -248,16 +253,17 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
         
         other_fields = ["age", "location", "family", "concerns", "goals", "personality", "experiences"]
         for field in other_fields:
-            if extracted_info.get(field) and extracted_info[field] != current_data["other_info"].get(field):
-                current_data["other_info"][field] = extracted_info[field]
-                memory_item = {
-                    "type": field,
-                    "content": extracted_info[field],
-                    "timestamp": datetime.now().isoformat(),
-                    "source": "conversation"
-                }
-                current_data["memory_items"].append(memory_item)
-                updated = True
+            if extracted_info.get(field):
+                existing_items = [item['content'] for item in current_data["memory_items"] if item['type'] == field]
+                if extracted_info[field] not in existing_items:
+                    memory_item = {
+                        "type": field,
+                        "content": extracted_info[field],
+                        "timestamp": datetime.now().isoformat(),
+                        "source": "conversation"
+                    }
+                    current_data["memory_items"].append(memory_item)
+                    updated = True
         
         if extracted_info.get("name") and extracted_info["name"] != current_data.get("name"):
             current_data["name"] = extracted_info["name"]
@@ -314,6 +320,29 @@ async def get_conversation_history(user_id: str):
         return {"conversations": []}
     
     return {"conversations": conversations[user_id]}
+
+@app.get("/api/export-conversations/{user_id}")
+async def export_conversations_csv(user_id: str):
+    """Export conversation history as CSV"""
+    if user_id not in conversations:
+        raise HTTPException(status_code=404, detail="No conversations found for user")
+    
+    output = StringIO()
+    writer = csv.writer(output)
+    
+    writer.writerow(["timestamp", "user_message", "ai_response"])
+    
+    for conv in conversations[user_id]:
+        writer.writerow([
+            conv["timestamp"],
+            conv["user_message"],
+            conv["ai_response"]
+        ])
+    
+    csv_content = output.getvalue()
+    output.close()
+    
+    return {"csv_data": csv_content, "filename": f"conversations_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
 
 @app.delete("/api/users/{user_id}")
 async def delete_user(user_id: str):
