@@ -176,14 +176,14 @@ function App() {
                       </div>
                     )}
                     {messages.map((message, index) => (
-                      <div key={index} className="space-y-3">
+                      <div key={index} className="space-y-4 mb-6">
                         <div className="flex justify-end">
-                          <div className="bg-blue-500 text-white p-3 rounded-lg max-w-xs lg:max-w-md">
+                          <div className="bg-blue-500 text-white p-3 rounded-lg max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl">
                             <p className="whitespace-pre-wrap">{message.user_message}</p>
                           </div>
                         </div>
                         <div className="flex justify-start">
-                          <div className="bg-gray-100 p-3 rounded-lg max-w-xs lg:max-w-md">
+                          <div className="bg-gray-100 p-3 rounded-lg max-w-sm md:max-w-md lg:max-w-lg xl:max-w-xl">
                             <div className="flex items-center gap-2 mb-2">
                               <Brain className="w-4 h-4 text-blue-600" />
                               <span className="text-sm font-medium text-blue-600">カウンセラー</span>
