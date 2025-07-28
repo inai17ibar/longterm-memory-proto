@@ -55,6 +55,7 @@ async def create_or_update_user(user_info: UserInfo):
             "hobbies": user_info.hobbies or [],
             "job": user_info.job,
             "other_info": user_info.other_info or {},
+            "memory_items": [],
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
@@ -104,12 +105,23 @@ async def chat_with_counselor(chat_message: ChatMessage):
     user_context = ""
     if user_id in user_memory:
         user_data = user_memory[user_id]
+        
+        memory_summary = ""
+        if user_data.get('memory_items'):
+            recent_memories = user_data['memory_items'][-20:]
+            memory_summary = "\n記憶している情報:\n"
+            for item in recent_memories:
+                memory_summary += f"- {item['type']}: {item['content']}\n"
+        
         user_context = f"""
 ユーザー情報:
 - 名前: {user_data.get('name', '不明')}
 - 職業: {user_data.get('job', '不明')}
 - 趣味: {', '.join(user_data.get('hobbies', [])) if user_data.get('hobbies') else '不明'}
 - その他の情報: {json.dumps(user_data.get('other_info', {}), ensure_ascii=False)}
+{memory_summary}
+
+重要: 上記の記憶している情報を会話の中で自然に活用してください。ユーザーの過去の発言や状況を覚えていることを示し、継続的なサポートを提供してください。
 """
     
     recent_conversations = conversations[user_id][-10:] if conversations[user_id] else []
@@ -168,7 +180,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
         raise HTTPException(status_code=500, detail=f"Error calling OpenAI API: {str(e)}")
 
 async def extract_user_info(user_id: str, user_message: str, ai_response: str) -> bool:
-    """Extract user information from conversation using AI-powered analysis"""
+    """Extract user information from conversation using AI-powered analysis with 100-item limit"""
     updated = False
     
     if user_id not in user_memory:
@@ -177,6 +189,7 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
             "hobbies": [],
             "job": None,
             "other_info": {},
+            "memory_items": [],
             "created_at": datetime.now().isoformat(),
             "updated_at": datetime.now().isoformat()
         }
@@ -232,25 +245,59 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
         
         current_data = user_memory[user_id]
         
+        
+        other_fields = ["age", "location", "family", "concerns", "goals", "personality", "experiences"]
+        for field in other_fields:
+            if extracted_info.get(field) and extracted_info[field] != current_data["other_info"].get(field):
+                current_data["other_info"][field] = extracted_info[field]
+                memory_item = {
+                    "type": field,
+                    "content": extracted_info[field],
+                    "timestamp": datetime.now().isoformat(),
+                    "source": "conversation"
+                }
+                current_data["memory_items"].append(memory_item)
+                updated = True
+        
         if extracted_info.get("name") and extracted_info["name"] != current_data.get("name"):
             current_data["name"] = extracted_info["name"]
+            memory_item = {
+                "type": "name",
+                "content": extracted_info["name"],
+                "timestamp": datetime.now().isoformat(),
+                "source": "conversation"
+            }
+            current_data["memory_items"].append(memory_item)
             updated = True
         
         if extracted_info.get("job") and extracted_info["job"] != current_data.get("job"):
             current_data["job"] = extracted_info["job"]
+            memory_item = {
+                "type": "job",
+                "content": extracted_info["job"],
+                "timestamp": datetime.now().isoformat(),
+                "source": "conversation"
+            }
+            current_data["memory_items"].append(memory_item)
             updated = True
         
         if extracted_info.get("hobbies") and isinstance(extracted_info["hobbies"], list):
             new_hobbies = [h for h in extracted_info["hobbies"] if h and h not in current_data["hobbies"]]
             if new_hobbies:
                 current_data["hobbies"].extend(new_hobbies)
+                for hobby in new_hobbies:
+                    memory_item = {
+                        "type": "hobby",
+                        "content": hobby,
+                        "timestamp": datetime.now().isoformat(),
+                        "source": "conversation"
+                    }
+                    current_data["memory_items"].append(memory_item)
                 updated = True
         
-        other_fields = ["age", "location", "family", "concerns", "goals", "personality", "experiences"]
-        for field in other_fields:
-            if extracted_info.get(field) and extracted_info[field] != current_data["other_info"].get(field):
-                current_data["other_info"][field] = extracted_info[field]
-                updated = True
+        if len(current_data["memory_items"]) > 100:
+            items_to_remove = len(current_data["memory_items"]) - 100
+            current_data["memory_items"] = current_data["memory_items"][items_to_remove:]
         
         if updated:
             current_data["updated_at"] = datetime.now().isoformat()

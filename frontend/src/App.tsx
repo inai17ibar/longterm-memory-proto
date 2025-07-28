@@ -205,7 +205,58 @@ function App() {
                   </Alert>
                 )}
 
-                <div className="flex gap-2 mt-4">
+                <div className="mb-4">
+                  <p className="text-sm text-gray-600 mb-2">よくある相談:</p>
+                  <div className="flex flex-wrap gap-2">
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentMessage("どうやって気分転換をすればいいですか？")}
+                      disabled={isLoading}
+                      className="text-xs"
+                    >
+                      気分転換の方法
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentMessage("とても不安です")}
+                      disabled={isLoading}
+                      className="text-xs"
+                    >
+                      不安な気持ち
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentMessage("うつのせいか体を動かすこともつらいです")}
+                      disabled={isLoading}
+                      className="text-xs"
+                    >
+                      体調の不調
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentMessage("仕事に復帰するのが怖いです")}
+                      disabled={isLoading}
+                      className="text-xs"
+                    >
+                      復職への不安
+                    </Button>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => setCurrentMessage("眠れない日が続いています")}
+                      disabled={isLoading}
+                      className="text-xs"
+                    >
+                      睡眠の問題
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="flex gap-2">
                   <Input
                     value={currentMessage}
                     onChange={(e) => setCurrentMessage(e.target.value)}
