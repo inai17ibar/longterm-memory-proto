@@ -1,5 +1,5 @@
 import React from 'react';
 
 export const ScrollArea: React.FC<{ className?: string; children: React.ReactNode }> = ({ className, children }) => (
-  <div className={className} style={{ overflowY: 'auto', maxHeight: 500 }}>{children}</div>
+  <div className={`overflow-y-auto scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-gray-100 ${className || ''}`}>{children}</div>
 ); 
