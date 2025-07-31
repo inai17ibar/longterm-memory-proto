@@ -1,11 +1,11 @@
 import { useState, useEffect, useRef } from 'react'
 import { Send, User, Brain, Trash2, Info, Download } from 'lucide-react'
-import { Button } from '@/components/ui/button'
-import { Input } from '@/components/ui/input'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { ScrollArea } from '@/components/ui/scroll-area'
-import { Alert, AlertDescription } from '@/components/ui/alert'
-import { Badge } from '@/components/ui/badge'
+import { Button } from './components/ui/button'
+import { Input } from './components/ui/input'
+import { Card, CardContent, CardHeader, CardTitle } from './components/ui/card'
+import { ScrollArea } from './components/ui/scroll-area'
+import { Alert, AlertDescription } from './components/ui/alert'
+import { Badge } from './components/ui/badge'
 
 interface Message {
   user_message: string
@@ -37,7 +37,7 @@ function App() {
   const [isExporting, setIsExporting] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   
-  const API_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8000'
 
   useEffect(() => {
     let storedUserId = localStorage.getItem('counseling_user_id')
@@ -128,7 +128,7 @@ function App() {
   }
 
   const clearConversation = async () => {
-    if (!confirm('会話履歴を削除しますか？この操作は取り消せません。')) return
+    if (!window.confirm('会話履歴を削除しますか？この操作は取り消せません。')) return
 
     try {
       await fetch(`${API_URL}/api/users/${userId}`, {
@@ -242,8 +242,6 @@ function App() {
                   <p className="text-sm text-gray-600 mb-2">よくある相談:</p>
                   <div className="flex flex-wrap gap-2">
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => setCurrentMessage("どうやって気分転換をすればいいですか？")}
                       disabled={isLoading}
                       className="text-xs"
@@ -251,8 +249,6 @@ function App() {
                       気分転換の方法
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => setCurrentMessage("とても不安です")}
                       disabled={isLoading}
                       className="text-xs"
@@ -260,8 +256,6 @@ function App() {
                       不安な気持ち
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => setCurrentMessage("うつのせいか体を動かすこともつらいです")}
                       disabled={isLoading}
                       className="text-xs"
@@ -269,8 +263,6 @@ function App() {
                       体調の不調
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => setCurrentMessage("仕事に復帰するのが怖いです")}
                       disabled={isLoading}
                       className="text-xs"
@@ -278,8 +270,6 @@ function App() {
                       復職への不安
                     </Button>
                     <Button
-                      variant="outline"
-                      size="sm"
                       onClick={() => setCurrentMessage("眠れない日が続いています")}
                       disabled={isLoading}
                       className="text-xs"
@@ -292,14 +282,14 @@ function App() {
                 <div className="flex gap-2">
                   <Input
                     value={currentMessage}
-                    onChange={(e) => setCurrentMessage(e.target.value)}
+                    onChange={(e: React.ChangeEvent<HTMLInputElement>) => setCurrentMessage(e.target.value)}
                     onKeyPress={handleKeyPress}
                     placeholder="メッセージを入力してください..."
                     disabled={isLoading}
                     className="flex-1"
                   />
-                  <Button 
-                    onClick={sendMessage} 
+                  <Button
+                    onClick={sendMessage}
                     disabled={isLoading || !currentMessage.trim()}
                     className="px-4"
                   >
@@ -342,7 +332,7 @@ function App() {
                         <span className="text-sm font-medium text-gray-600">趣味:</span>
                         <div className="flex flex-wrap gap-1 mt-1">
                           {userInfo.hobbies.map((hobby, index) => (
-                            <Badge key={index} variant="secondary" className="text-xs">
+                            <Badge key={index} className="text-xs">
                               {hobby}
                             </Badge>
                           ))}
@@ -425,8 +415,6 @@ function App() {
               <CardContent>
                 <Button 
                   onClick={clearConversation}
-                  variant="destructive"
-                  size="sm"
                   className="w-full flex items-center gap-2 mb-2"
                 >
                   <Trash2 className="w-4 h-4" />
@@ -434,8 +422,6 @@ function App() {
                 </Button>
                 <Button 
                   onClick={exportConversations}
-                  variant="outline"
-                  size="sm"
                   disabled={isExporting}
                   className="w-full flex items-center gap-2"
                 >
