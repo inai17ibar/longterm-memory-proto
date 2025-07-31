@@ -130,6 +130,19 @@ function App() {
     }
   };
 
+  const clearChatHistory = async () => {
+    if (!window.confirm('チャット履歴をクリアしますか？記憶された情報は保持されます。')) return;
+
+    try {
+      await fetch(`${API_URL}/api/conversations/${userId}`, {
+        method: 'DELETE'
+      });
+      setMessages([]);
+    } catch (error) {
+      setError('チャット履歴のクリアに失敗しました。');
+    }
+  };
+
   const exportConversations = async () => {
     setIsExporting(true);
     try {
@@ -451,7 +464,6 @@ function App() {
                 </div>
 
                 {/* カテゴリ別記憶情報 */}
-                {console.log('UserInfo memory_items:', userInfo.memory_items)} {/* デバッグログ */}
                 {userInfo.memory_items && userInfo.memory_items.length > 0 && (
                   <div>
                     {/* 悩み・心配事 */}
@@ -728,6 +740,28 @@ function App() {
             </h2>
             <div style={{ display: 'flex', flexDirection: 'column', gap: '12px' }}>
               <button 
+                onClick={clearChatHistory}
+                style={{
+                  width: '100%',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  gap: '8px',
+                  padding: '8px 16px',
+                  backgroundColor: '#f59e0b',
+                  color: 'white',
+                  border: 'none',
+                  borderRadius: '8px',
+                  cursor: 'pointer',
+                  fontSize: '14px'
+                }}
+              >
+                🧹 チャット履歴をクリア
+              </button>
+              <p style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', margin: '0 8px' }}>
+                ※記憶された情報は保持されます
+              </p>
+              <button 
                 onClick={clearConversation}
                 style={{
                   width: '100%',
@@ -744,8 +778,11 @@ function App() {
                   fontSize: '14px'
                 }}
               >
-                🗑️ 会話履歴を削除
+                🗑️ 完全にデータを削除
               </button>
+              <p style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', margin: '0 8px' }}>
+                ※記憶された情報も全て削除されます
+              </p>
               <button 
                 onClick={exportConversations}
                 disabled={isExporting}

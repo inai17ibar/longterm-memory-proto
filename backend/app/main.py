@@ -422,6 +422,13 @@ async def export_conversations_csv(user_id: str):
     
     return {"csv_data": csv_content, "filename": f"conversations_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
 
+@app.delete("/api/conversations/{user_id}")
+async def clear_conversations(user_id: str):
+    """Clear conversation history while keeping user memory"""
+    if user_id in conversations:
+        del conversations[user_id]
+    return {"message": "Conversation history cleared successfully"}
+
 @app.delete("/api/users/{user_id}")
 async def delete_user(user_id: str):
     """Delete user data"""
