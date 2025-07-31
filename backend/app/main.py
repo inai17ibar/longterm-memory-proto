@@ -142,7 +142,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
 対面での会話のように比較的短い文で返答し、自然で人間らしいバリエーションに富んだ会話を目指します。
 
 制約条件：
-・一度の発話は400文字以内とします。
+・一度の発話は400文字以内,150文字前後をベースとします。
 ・ユーザとカウンセリングのように繰り返し対話してください。
 ・ユーザに対して優しく、親しみやすい言葉使いを使用し、リラックスした雰囲気を作り出すよう努めます。
 ・穏やかな会話調で、日本語で話し方が単調になりすぎず人間の対話のようにバリエーションに富んだものを提供します。
@@ -161,7 +161,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
             ai_response = f"こんにちは。お話をお聞かせいただき、ありがとうございます。「{message}」について、お気持ちをお聞かせください。私はあなたのサポートをさせていただきます。"
         else:
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}
@@ -194,9 +194,12 @@ async def chat_with_counselor(chat_message: ChatMessage):
             "timestamp": datetime.now().isoformat()
         })
         
+        # エラー時でも記憶情報を抽出する
+        user_info_updated = await extract_user_info(user_id, message, ai_response)
+        
         return ChatResponse(
             response=ai_response,
-            user_info_updated=False
+            user_info_updated=user_info_updated
         )
 
 async def extract_user_info(user_id: str, user_message: str, ai_response: str) -> bool:
@@ -225,11 +228,36 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
             pass
         
         if not os.getenv("OPENAI_API_KEY"):
-            # Skip AI extraction when no API key
+            # モック抽出：基本的なキーワードベースの抽出
             extracted_info = {}
+            message_lower = user_message.lower()
+            
+            # 簡単なキーワードベースの抽出
+            if any(word in message_lower for word in ['不安', '心配', '悩み', '困って']):
+                extracted_info['concerns'] = user_message
+            if any(word in message_lower for word in ['目標', 'やりたい', '頑張り', '復職']):
+                extracted_info['goals'] = user_message
+            if any(word in message_lower for word in ['眠れない', '食欲', '体調', '症状', '痛み']):
+                extracted_info['symptoms'] = user_message
+            if any(word in message_lower for word in ['ストレス', 'プレッシャー', '原因', 'きっかけ']):
+                extracted_info['triggers'] = user_message
+            if any(word in message_lower for word in ['散歩', 'リラックス', '気分転換', '対処']):
+                extracted_info['coping_methods'] = user_message
+            if any(word in message_lower for word in ['家族', '友達', 'サポート', '支え']):
+                extracted_info['support_system'] = user_message
+            if any(word in message_lower for word in ['薬', '通院', '病院', '治療']):
+                extracted_info['medication'] = user_message
+            if any(word in message_lower for word in ['会社', '職場', '休職', '復職', '仕事']):
+                extracted_info['work_status'] = user_message
+            if any(word in message_lower for word in ['朝', '夜', '生活', '日常', 'ルーティン']):
+                extracted_info['daily_routine'] = user_message
+            if any(word in message_lower for word in ['気持ち', '感情', '落ち込み', '嬉しい', '悲しい']):
+                extracted_info['emotional_state'] = user_message
+            
+            print(f"Mock extraction result: {extracted_info}")  # デバッグログ
         else:
             extraction_prompt = f"""
-以下のユーザーメッセージから個人情報を抽出してください。JSONフォーマットで回答してください。
+以下のユーザーメッセージから個人情報とメンタルヘルス関連情報を抽出してください。JSONフォーマットで回答してください。
 情報が明確でない場合は null を返してください。
 
 ユーザーメッセージ: "{user_message}"
@@ -242,20 +270,29 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
     "age": "年齢（数字のみ）",
     "location": "住んでいる場所",
     "family": "家族構成に関する情報",
-    "concerns": "悩みや心配事",
-    "goals": "目標や願望",
+    "concerns": "悩みや心配事・不安に思っていること",
+    "goals": "目標や願望・やりたいこと",
     "personality": "性格的特徴",
-    "experiences": "重要な体験や出来事"
+    "experiences": "重要な体験や出来事",
+    "symptoms": "体調不良・症状（睡眠、食欲、気分の変化など）",
+    "triggers": "ストレスの原因・きっかけ",
+    "coping_methods": "対処法・リラックス方法・気分転換方法",
+    "support_system": "サポートしてくれる人・相談相手",
+    "medication": "服薬状況・通院状況",
+    "work_status": "勤務状況・休職状況・復職に関する情報",
+    "daily_routine": "日常の過ごし方・生活パターン",
+    "emotional_state": "現在の気持ち・感情状態"
 }}
 
 注意: 
 - 明確に言及されていない情報は null にしてください
 - 趣味は配列で複数返してください
+- メンタルヘルス関連の情報は特に丁寧に抽出してください
 - 推測ではなく、明確に述べられた情報のみ抽出してください
 """
 
             response = client.chat.completions.create(
-                model="gpt-3.5-turbo",
+                model="gpt-4o-mini",
                 messages=[
                     {"role": "system", "content": "あなたは日本語テキストから個人情報を正確に抽出するAIアシスタントです。JSONフォーマットでのみ回答してください。"},
                     {"role": "user", "content": extraction_prompt}
@@ -279,19 +316,32 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
         current_data = user_memory[user_id]
         
         
-        other_fields = ["age", "location", "family", "concerns", "goals", "personality", "experiences"]
+        other_fields = ["age", "location", "family", "concerns", "goals", "personality", "experiences", 
+                       "symptoms", "triggers", "coping_methods", "support_system", "medication", 
+                       "work_status", "daily_routine", "emotional_state"]
         for field in other_fields:
             if extracted_info.get(field):
-                existing_items = [item['content'] for item in current_data["memory_items"] if item['type'] == field]
-                if extracted_info[field] not in existing_items:
-                    memory_item = {
-                        "type": field,
-                        "content": extracted_info[field],
-                        "timestamp": datetime.now().isoformat(),
-                        "source": "conversation"
-                    }
-                    current_data["memory_items"].append(memory_item)
-                    updated = True
+                field_value = extracted_info[field].strip()
+                if field_value:  # 空文字列でない場合のみ処理
+                    existing_items = [item['content'] for item in current_data["memory_items"] if item['type'] == field]
+                    # より柔軟な重複チェック：完全一致のみをチェック（部分一致は除外）
+                    is_duplicate = any(
+                        field_value.lower().strip() == existing.lower().strip()
+                        for existing in existing_items
+                    )
+                    
+                    if not is_duplicate:
+                        memory_item = {
+                            "type": field,
+                            "content": field_value,
+                            "timestamp": datetime.now().isoformat(),
+                            "source": "conversation"
+                        }
+                        current_data["memory_items"].append(memory_item)
+                        updated = True
+                        print(f"Added memory item: {field} = {field_value}")  # デバッグログ
+                    else:
+                        print(f"Skipped duplicate memory item: {field} = {field_value}")  # デバッグログ
         
         if extracted_info.get("name") and extracted_info["name"] != current_data.get("name"):
             current_data["name"] = extracted_info["name"]
