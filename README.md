@@ -41,6 +41,7 @@ cd backend
 # 仮想環境の作成と有効化
 python -m venv venv
 venv\Scripts\activate  # Windows
+# venv/Scripts/activate #bash
 # source venv/bin/activate  # macOS/Linux
 
 # 依存関係のインストール

@@ -240,7 +240,8 @@ function App() {
                           padding: '8px 12px',
                           borderRadius: '16px',
                           maxWidth: '70%',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          whiteSpace: 'pre-wrap'
                         }}>
                           {message.ai_response}
                         </div>
