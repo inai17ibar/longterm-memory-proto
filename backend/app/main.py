@@ -10,6 +10,7 @@ from datetime import datetime
 import uuid
 import csv
 from io import StringIO
+import re
 
 load_dotenv()
 
@@ -43,7 +44,88 @@ class ChatMessage(BaseModel):
 
 class ChatResponse(BaseModel):
     response: str
+    response_type: int  # 1, 2, 3のどのパターンか
     user_info_updated: bool = False
+
+def analyze_response_pattern(user_message: str, conversation_history: List[Dict]) -> int:
+    """ユーザーメッセージを分析して、回答パターン(1,2,3)を判断する"""
+    message = user_message.strip().lower()
+    
+    # パターン1: 短い返事や話の途中
+    short_responses = ['はい', 'うん', 'そう', 'まあ', 'うーん', 'あー', 'えー', '...', '。', 'そうですね']
+    if (len(message) <= 10 and any(resp in message for resp in short_responses)) or message.endswith('...'):
+        return 1
+    
+    # 最近の会話履歴をチェック
+    if len(conversation_history) >= 2:
+        last_ai_response = conversation_history[-1].get('ai_response', '')
+        if '？' in last_ai_response or '?' in last_ai_response:
+            # 前回質問していて、短い回答の場合
+            if len(message) <= 15:
+                return 1
+    
+    # パターン3: 解決策を求めているか、具体的な悩みを表現している
+    solution_keywords = ['どうすれば', 'どうしたら', 'どうやって', '方法', '解決', 'アドバイス', '助け', 'わからない']
+    problem_keywords = ['困って', '悩んで', '辛い', '苦しい', 'もうだめ', '限界', '疲れた', 'ストレス', '不安', '心配']
+    
+    if any(keyword in message for keyword in solution_keywords + problem_keywords):
+        return 3
+    
+    # デフォルトはパターン2（傾聴）
+    return 2
+
+def generate_system_prompt(user_context: str, conversation_context: str, response_pattern: int) -> str:
+    """回答パターンに応じたシステムプロンプトを生成"""
+    
+    base_prompt = f"""あなたは「メンタルバリアフリー」というビジョンを持つAIメンタルカウンセラーです。
+
+## あなたのビジョンと基本スタンス
+- 不安や悩みを抱える人の感情も、それが個性であると捉えてください
+- 無理に更生させようとせず、あなた自身がユーザーに合わせて変わってください
+- ユーザーにとって「ここだけは自分らしくいられる」「居心地が良い」場所を提供してください
+
+## 制約条件
+- うつ病で休職中のユーザや復職を目指している方、その他メンタルヘルスに関する方を主な対象とします
+- 医療行為や診断は行わず、緊急事態では専門家への相談を促します
+- 対面での会話のように自然で人間らしいバリエーションに富んだ会話を目指します
+- 記憶しているユーザの情報を会話の中で自然に活用してください
+- 適度に改行を入れて読みやすくしてください
+
+{user_context}
+
+{conversation_context}"""
+
+    if response_pattern == 1:
+        return base_prompt + """
+
+## 回答方針（パターン1: 応答のみ）
+- ユーザーの話が途中で途切れており、続きがありそうな状況です
+- 「はい」「なるほど」「そうなんですね」など適切な相槌だけしてください
+- 特に質問をする必要はありません
+- 15文字以下で回答してください
+- ユーザーが話を続けやすい雰囲気を作ってください"""
+
+    elif response_pattern == 2:
+        return base_prompt + """
+
+## 回答方針（パターン2: 傾聴）
+- 傾聴型で、ユーザーが気軽に話せるように質問してください
+- 共感が第一：「〜してくれてありがとう」「〜なのは自然なこと」「〜という気持ち、すごくわかります」
+- 評価しない・急がない：「〜すべき」「〜が悪い」は避け、ただ話を「受け止める」
+- 安心・安全の場づくり：「ここでは〜しても大丈夫」「一人じゃないです」
+- ポジティブもネガティブも尊重：「その報告うれしいです」「苦しい中でよく話してくれました」
+- 100文字以下で回答してください"""
+
+    else:  # pattern 3
+        return base_prompt + """
+
+## 回答方針（パターン3: 解決策提案・客観的視点）
+- ユーザーが悩んで周りが見えなくなっている状況かもしれません
+- 客観的で冷静な視点を入れてあげてください
+- 客観的に、ユーザーの良さを見つけて褒めてください
+- 解決を急がず、ユーザーが安心して話せる感覚を持たせてください
+- 解決策の押し付けはせず、どんなことができそうか一緒に考える姿勢を持ってください
+- 200文字以下で回答してください"""
 
 @app.get("/healthz")
 async def healthz():
@@ -107,6 +189,9 @@ async def chat_with_counselor(chat_message: ChatMessage):
     if user_id not in conversations:
         conversations[user_id] = []
     
+    # 回答パターンを判断
+    response_pattern = analyze_response_pattern(message, conversations[user_id])
+    
     user_context = ""
     if user_id in user_memory:
         user_data = user_memory[user_id]
@@ -136,32 +221,17 @@ async def chat_with_counselor(chat_message: ChatMessage):
         for conv in recent_conversations:
             conversation_context += f"ユーザー: {conv['user_message']}\nカウンセラー: {conv['ai_response']}\n\n"
     
-    system_prompt = f"""あなたはAIメンタルカウンセラーで、うつ病で休職中のユーザや、うつ病からの復帰を目指している、または復帰の途中のユーザを対象にメンタルヘルスサポートを提供するカウンセラーです。
-
-このGPTはユーザとの対話を通じて共感を示し、ユーザの気持ちを理解しようと努めます。問題解決に直接踏み込むことはせず、ユーザが安心して話せる場を提供します。
-対面での会話のように比較的短い文で返答し、自然で人間らしいバリエーションに富んだ会話を目指します。
-
-制約条件：
-・一度の発話は400文字以内,150文字前後をベースとします。
-・ユーザとカウンセリングのように繰り返し対話してください。
-・ユーザに対して優しく、親しみやすい言葉使いを使用し、リラックスした雰囲気を作り出すよう努めます。
-・穏やかな会話調で、日本語で話し方が単調になりすぎず人間の対話のようにバリエーションに富んだものを提供します。
-・このGPTは医療行為や診断を行わず、専門的な治療を提供しません。緊急事態や危機的状況に対しては、適切な専門家に相談するようユーザに促します。
-・また、ユーザが困っていることがありそうなときは、その解決策を複数提示してあげてください。これもできるだけバリエーションに富むようにしてください。
-・ユーザの話を聞きながら、ユーザの気持ちを理解し、ユーザの気持ちに合わせて会話を進めてください。
-・記憶しているユーザの情報を会話の中で自然に活用してください。
-・話の区切りには適度に改行をいれて読みやすくするよう注意してください。
-
-{user_context}
-
-{conversation_context}
-
-日本語で自然に会話してください。"""
+    system_prompt = generate_system_prompt(user_context, conversation_context, response_pattern)
 
     try:
         # Mock response for testing when OpenAI API is not available
-        if not os.getenv("OPENAI_API_KEY") or "insufficient_quota" in str(e) if 'e' in locals() else False:
-            ai_response = f"こんにちは。お話をお聞かせいただき、ありがとうございます。「{message}」について、お気持ちをお聞かせください。私はあなたのサポートをさせていただきます。"
+        if not os.getenv("OPENAI_API_KEY"):
+            if response_pattern == 1:
+                ai_response = "はい。"
+            elif response_pattern == 2:
+                ai_response = f"「{message}」についてお話しいただき、ありがとうございます。\n\nその気持ち、とてもよくわかります。もう少し詳しく聞かせていただけますか？"
+            else:  # pattern 3
+                ai_response = f"お話ししていただき、ありがとうございます。\n\n{message}について悩んでいらっしゃるのですね。一人で抱え込まずに話してくださって、とても勇気があると思います。\n\n一緒にどんなことができそうか考えてみませんか？"
         else:
             response = client.chat.completions.create(
                 model="gpt-4o",
@@ -177,6 +247,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
         conversations[user_id].append({
             "user_message": message,
             "ai_response": ai_response,
+            "response_pattern": response_pattern,
             "timestamp": datetime.now().isoformat()
         })
         
@@ -184,24 +255,31 @@ async def chat_with_counselor(chat_message: ChatMessage):
         
         return ChatResponse(
             response=ai_response,
+            response_type=response_pattern,
             user_info_updated=user_info_updated
         )
         
     except Exception as e:
         # Fallback to mock response if OpenAI API fails
-        ai_response = f"申し訳ございませんが、現在システムに問題が発生しております。「{message}」についてお話しいただき、ありがとうございます。お気持ちをお聞かせください。"
+        if response_pattern == 1:
+            ai_response = "はい。"
+        elif response_pattern == 2:
+            ai_response = f"お話しいただき、ありがとうございます。その気持ち、よくわかります。"
+        else:
+            ai_response = f"申し訳ございませんが、現在システムに問題が発生しております。お話しいただき、ありがとうございます。"
         
         conversations[user_id].append({
             "user_message": message,
             "ai_response": ai_response,
+            "response_pattern": response_pattern,
             "timestamp": datetime.now().isoformat()
         })
         
-        # エラー時でも記憶情報を抽出する
         user_info_updated = await extract_user_info(user_id, message, ai_response)
         
         return ChatResponse(
             response=ai_response,
+            response_type=response_pattern,
             user_info_updated=user_info_updated
         )
 
@@ -221,83 +299,74 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
         }
     
     try:
-        # Mock extraction for testing - simple keyword-based extraction
-        extracted_info = {}
-        message_lower = user_message.lower()
-        
-        # Simple extraction patterns
-        if "名前" in user_message or "です" in user_message:
-            # This is a very basic extraction - in reality you'd use more sophisticated NLP
-            pass
-        
         if not os.getenv("OPENAI_API_KEY"):
             # モック抽出：基本的なキーワードベースの抽出
             extracted_info = {}
             message_lower = user_message.lower()
             
-            # 簡単なキーワードベースの抽出
-            if any(word in message_lower for word in ['不安', '心配', '悩み', '困って']):
+            # メンタルヘルスに特化した抽出パターン
+            if any(word in message_lower for word in ['不安', '心配', '悩み', '困って', '辛い', '苦しい']):
                 extracted_info['concerns'] = user_message
-            if any(word in message_lower for word in ['目標', 'やりたい', '頑張り', '復職']):
+            if any(word in message_lower for word in ['目標', 'やりたい', '頑張り', '復職', '改善']):
                 extracted_info['goals'] = user_message
-            if any(word in message_lower for word in ['眠れない', '食欲', '体調', '症状', '痛み']):
+            if any(word in message_lower for word in ['眠れない', '食欲', '体調', '症状', '痛み', '疲れ']):
                 extracted_info['symptoms'] = user_message
-            if any(word in message_lower for word in ['ストレス', 'プレッシャー', '原因', 'きっかけ']):
+            if any(word in message_lower for word in ['ストレス', 'プレッシャー', '原因', 'きっかけ', '職場']):
                 extracted_info['triggers'] = user_message
-            if any(word in message_lower for word in ['散歩', 'リラックス', '気分転換', '対処']):
+            if any(word in message_lower for word in ['散歩', 'リラックス', '気分転換', '対処', '趣味']):
                 extracted_info['coping_methods'] = user_message
-            if any(word in message_lower for word in ['家族', '友達', 'サポート', '支え']):
+            if any(word in message_lower for word in ['家族', '友達', 'サポート', '支え', '相談']):
                 extracted_info['support_system'] = user_message
-            if any(word in message_lower for word in ['薬', '通院', '病院', '治療']):
+            if any(word in message_lower for word in ['薬', '通院', '病院', '治療', '診察']):
                 extracted_info['medication'] = user_message
-            if any(word in message_lower for word in ['会社', '職場', '休職', '復職', '仕事']):
+            if any(word in message_lower for word in ['会社', '職場', '休職', '復職', '仕事', '上司']):
                 extracted_info['work_status'] = user_message
-            if any(word in message_lower for word in ['朝', '夜', '生活', '日常', 'ルーティン']):
+            if any(word in message_lower for word in ['朝', '夜', '生活', '日常', 'ルーティン', '時間']):
                 extracted_info['daily_routine'] = user_message
-            if any(word in message_lower for word in ['気持ち', '感情', '落ち込み', '嬉しい', '悲しい']):
+            if any(word in message_lower for word in ['気持ち', '感情', '落ち込み', '嬉しい', '悲しい', '怒り']):
                 extracted_info['emotional_state'] = user_message
             
-            print(f"Mock extraction result: {extracted_info}")  # デバッグログ
+            print(f"Mock extraction result: {extracted_info}")
         else:
             extraction_prompt = f"""
-以下のユーザーメッセージから個人情報とメンタルヘルス関連情報を抽出してください。JSONフォーマットで回答してください。
-情報が明確でない場合は null を返してください。
+以下のユーザーメッセージからメンタルヘルス関連情報と個人情報を抽出してください。
+メンタルバリアフリーの観点から、ユーザーの感情や状況を個性として捉え、細かな変化も記録してください。
 
 ユーザーメッセージ: "{user_message}"
 
-以下のフォーマットで回答してください:
+以下のフォーマットで回答してください（JSONのみ）:
 {{
-    "name": "抽出された名前（フルネームまたは名前のみ）",
+    "name": "名前（明確に述べられた場合のみ）",
     "job": "職業・仕事内容",
-    "hobbies": ["趣味1", "趣味2", "趣味3"],
-    "age": "年齢（数字のみ）",
+    "hobbies": ["趣味1", "趣味2"],
+    "age": "年齢",
     "location": "住んでいる場所",
     "family": "家族構成に関する情報",
-    "concerns": "悩みや心配事・不安に思っていること",
+    "concerns": "現在の悩みや不安・心配事",
     "goals": "目標や願望・やりたいこと",
-    "personality": "性格的特徴",
+    "personality": "性格的特徴・個性",
     "experiences": "重要な体験や出来事",
-    "symptoms": "体調不良・症状（睡眠、食欲、気分の変化など）",
-    "triggers": "ストレスの原因・きっかけ",
-    "coping_methods": "対処法・リラックス方法・気分転換方法",
-    "support_system": "サポートしてくれる人・相談相手",
-    "medication": "服薬状況・通院状況",
-    "work_status": "勤務状況・休職状況・復職に関する情報",
-    "daily_routine": "日常の過ごし方・生活パターン",
-    "emotional_state": "現在の気持ち・感情状態"
+    "symptoms": "メンタル・身体的症状（睡眠、食欲、気分変化等）",
+    "triggers": "ストレス要因・きっかけ",
+    "coping_methods": "対処法・リラックス方法・気分転換",
+    "support_system": "サポート体制・相談相手",
+    "medication": "服薬・通院状況",
+    "work_status": "勤務・休職・復職状況",
+    "daily_routine": "日常の過ごし方・生活リズム",
+    "emotional_state": "現在の気持ち・感情状態・心境"
 }}
 
-注意: 
+注意:
 - 明確に言及されていない情報は null にしてください
-- 趣味は配列で複数返してください
-- メンタルヘルス関連の情報は特に丁寧に抽出してください
-- 推測ではなく、明確に述べられた情報のみ抽出してください
+- 小さな変化や気づきも記録してください
+- 感情の変化は特に丁寧に抽出してください
+- 推測ではなく、実際に述べられた内容のみ抽出してください
 """
 
             response = client.chat.completions.create(
-                model="gpt-4o-mini",
+                model="gpt-4o",
                 messages=[
-                    {"role": "system", "content": "あなたは日本語テキストから個人情報を正確に抽出するAIアシスタントです。JSONフォーマットでのみ回答してください。"},
+                    {"role": "system", "content": "あなたはメンタルヘルス情報を正確に抽出するAIアシスタントです。JSONフォーマットでのみ回答してください。"},
                     {"role": "user", "content": extraction_prompt}
                 ],
                 max_tokens=500,
@@ -318,18 +387,23 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
         
         current_data = user_memory[user_id]
         
+        # メンタルヘルス関連情報の抽出と保存
+        mental_health_fields = ["concerns", "goals", "personality", "experiences", 
+                               "symptoms", "triggers", "coping_methods", "support_system", 
+                               "medication", "work_status", "daily_routine", "emotional_state"]
         
-        other_fields = ["age", "location", "family", "concerns", "goals", "personality", "experiences", 
-                       "symptoms", "triggers", "coping_methods", "support_system", "medication", 
-                       "work_status", "daily_routine", "emotional_state"]
-        for field in other_fields:
+        other_fields = ["age", "location", "family"]
+        
+        for field in mental_health_fields + other_fields:
             if extracted_info.get(field):
                 field_value = extracted_info[field].strip()
-                if field_value:  # 空文字列でない場合のみ処理
+                if field_value and len(field_value) > 3:  # より意味のある情報のみ保存
                     existing_items = [item['content'] for item in current_data["memory_items"] if item['type'] == field]
-                    # より柔軟な重複チェック：完全一致のみをチェック（部分一致は除外）
+                    
+                    # 重複チェック（完全一致および類似チェック）
                     is_duplicate = any(
-                        field_value.lower().strip() == existing.lower().strip()
+                        field_value.lower().strip() == existing.lower().strip() or
+                        (len(field_value) > 10 and field_value.lower() in existing.lower())
                         for existing in existing_items
                     )
                     
@@ -342,10 +416,9 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
                         }
                         current_data["memory_items"].append(memory_item)
                         updated = True
-                        print(f"Added memory item: {field} = {field_value}")  # デバッグログ
-                    else:
-                        print(f"Skipped duplicate memory item: {field} = {field_value}")  # デバッグログ
+                        print(f"Added memory item: {field} = {field_value}")
         
+        # 基本情報の更新
         if extracted_info.get("name") and extracted_info["name"] != current_data.get("name"):
             current_data["name"] = extracted_info["name"]
             memory_item = {
@@ -382,6 +455,7 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
                     current_data["memory_items"].append(memory_item)
                 updated = True
         
+        # メモリ制限（100個まで）
         if len(current_data["memory_items"]) > 100:
             items_to_remove = len(current_data["memory_items"]) - 100
             current_data["memory_items"] = current_data["memory_items"][items_to_remove:]
@@ -392,6 +466,7 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
         return updated
         
     except Exception as e:
+        print(f"Error in extract_user_info: {e}")
         return False
 
 @app.get("/api/conversations/{user_id}")
@@ -411,13 +486,14 @@ async def export_conversations_csv(user_id: str):
     output = StringIO()
     writer = csv.writer(output)
     
-    writer.writerow(["timestamp", "user_message", "ai_response"])
+    writer.writerow(["timestamp", "user_message", "ai_response", "response_pattern"])
     
     for conv in conversations[user_id]:
         writer.writerow([
             conv["timestamp"],
             conv["user_message"],
-            conv["ai_response"]
+            conv["ai_response"],
+            conv.get("response_pattern", "unknown")
         ])
     
     csv_content = output.getvalue()
@@ -440,3 +516,24 @@ async def delete_user(user_id: str):
     if user_id in conversations:
         del conversations[user_id]
     return {"message": "User data deleted successfully"}
+
+# 新しいエンドポイント：回答パターンの統計を取得
+@app.get("/api/analytics/{user_id}")
+async def get_user_analytics(user_id: str):
+    """Get user conversation analytics"""
+    if user_id not in conversations:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    convs = conversations[user_id]
+    pattern_counts = {1: 0, 2: 0, 3: 0}
+    
+    for conv in convs:
+        pattern = conv.get("response_pattern", 2)
+        pattern_counts[pattern] += 1
+    
+    return {
+        "user_id": user_id,
+        "total_conversations": len(convs),
+        "pattern_distribution": pattern_counts,
+        "recent_patterns": [conv.get("response_pattern", 2) for conv in convs[-10:]]
+    }
