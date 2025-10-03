@@ -227,7 +227,8 @@ function App() {
                           padding: '8px 12px',
                           borderRadius: '16px',
                           maxWidth: '70%',
-                          fontSize: '14px'
+                          fontSize: '14px',
+                          whiteSpace: 'pre-wrap'
                         }}>
                           {message.user_message}
                         </div>
@@ -433,13 +434,13 @@ function App() {
                     {userInfo.name && (
                       <div>
                         <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>名前:</span>
-                        <p style={{ fontSize: '14px', marginTop: '2px' }}>{userInfo.name}</p>
+                        <p style={{ fontSize: '14px', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{userInfo.name}</p>
                       </div>
                     )}
                     {userInfo.job && (
                       <div>
                         <span style={{ fontSize: '14px', fontWeight: '500', color: '#6b7280' }}>職業:</span>
-                        <p style={{ fontSize: '14px', marginTop: '2px' }}>{userInfo.job}</p>
+                        <p style={{ fontSize: '14px', marginTop: '2px', whiteSpace: 'pre-wrap' }}>{userInfo.job}</p>
                       </div>
                     )}
                     {userInfo.hobbies && userInfo.hobbies.length > 0 && (
@@ -477,7 +478,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'concerns')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#7f1d1d', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#7f1d1d', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -495,7 +496,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'goals')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#15803d', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#15803d', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -513,7 +514,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'personality')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#a16207', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#a16207', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -531,7 +532,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'experiences')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#6b21a8', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#6b21a8', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -549,7 +550,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'family')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#047857', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#047857', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -567,7 +568,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'symptoms')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#86198f', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#86198f', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -585,7 +586,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'triggers')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#ea580c', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#ea580c', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -603,7 +604,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'coping_methods')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#0284c7', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#0284c7', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -621,7 +622,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'support_system')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#15803d', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#15803d', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -639,7 +640,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'medication')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#ca8a04', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#ca8a04', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -657,7 +658,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'work_status')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#64748b', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#64748b', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -675,7 +676,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'daily_routine')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#8b5cf6', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#8b5cf6', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}
@@ -693,7 +694,7 @@ function App() {
                           {userInfo.memory_items
                             .filter((item: any) => item.type === 'emotional_state')
                             .map((item: any, index: number) => (
-                              <div key={index} style={{ fontSize: '14px', color: '#b91c1c', padding: '4px 0' }}>
+                              <div key={index} style={{ fontSize: '14px', color: '#b91c1c', padding: '4px 0', whiteSpace: 'pre-wrap' }}>
                                 • {item.content}
                               </div>
                             ))}

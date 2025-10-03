@@ -11,6 +11,10 @@ import uuid
 import csv
 from io import StringIO
 import re
+import asyncio
+
+# LangChain記憶システムをインポート
+from .memory_system import memory_system, MemoryItem
 
 load_dotenv()
 
@@ -82,7 +86,7 @@ def generate_system_prompt(user_context: str, conversation_context: str, respons
 ## あなたのビジョンと基本スタンス
 - 不安や悩みを抱える人の感情も、それが個性であると捉えてください
 - 無理に更生させようとせず、あなた自身がユーザーに合わせて変わってください
-- ユーザーにとって「ここだけは自分らしくいられる」「居心地が良い」場所を提供してください
+- ユーザーにとって「ここでは自分らしくいられる」「居心地が良い」場所を提供してください
 
 ## 制約条件
 - うつ病で休職中のユーザや復職を目指している方、その他メンタルヘルスに関する方を主な対象とします
@@ -100,7 +104,7 @@ def generate_system_prompt(user_context: str, conversation_context: str, respons
 
 ## 回答方針（パターン1: 応答のみ）
 - ユーザーの話が途中で途切れており、続きがありそうな状況です
-- 「はい」「なるほど」「そうなんですね」など適切な相槌だけしてください
+- 「はい」「なるほど」「そうなんですね」「うんうん」「うん」など適切な相槌だけしてください
 - 特に質問をする必要はありません
 - 15文字以下で回答してください
 - ユーザーが話を続けやすい雰囲気を作ってください"""
@@ -110,7 +114,7 @@ def generate_system_prompt(user_context: str, conversation_context: str, respons
 
 ## 回答方針（パターン2: 傾聴）
 - 傾聴型で、ユーザーが気軽に話せるように質問してください
-- 共感が第一：「〜してくれてありがとう」「〜なのは自然なこと」「〜という気持ち、すごくわかります」
+- 共感が第一：「〜してくれてありがとう」「〜という気持ち、すごくわかります」
 - 評価しない・急がない：「〜すべき」「〜が悪い」は避け、ただ話を「受け止める」
 - 安心・安全の場づくり：「ここでは〜しても大丈夫」「一人じゃないです」
 - ポジティブもネガティブも尊重：「その報告うれしいです」「苦しい中でよく話してくれました」
@@ -234,12 +238,12 @@ async def chat_with_counselor(chat_message: ChatMessage):
                 ai_response = f"お話ししていただき、ありがとうございます。\n\n{message}について悩んでいらっしゃるのですね。一人で抱え込まずに話してくださって、とても勇気があると思います。\n\n一緒にどんなことができそうか考えてみませんか？"
         else:
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1",
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}
                 ],
-                max_tokens=1000,
+                max_tokens=1000 ,
                 temperature=0.7
             )
             ai_response = response.choices[0].message.content
