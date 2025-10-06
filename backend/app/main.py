@@ -189,24 +189,35 @@ async def chat_with_counselor(chat_message: ChatMessage):
     """Chat with AI counselor with long-term memory"""
     user_id = chat_message.user_id
     message = chat_message.message
-    
+
     if user_id not in conversations:
         conversations[user_id] = []
-    
+
     # 回答パターンを判断
     response_pattern = analyze_response_pattern(message, conversations[user_id])
-    
+
+    # LangChainベースの記憶システムから関連する記憶を検索
+    relevant_memories = await memory_system.retrieve_relevant_memories(user_id, message, limit=10)
+
     user_context = ""
     if user_id in user_memory:
         user_data = user_memory[user_id]
-        
+
+        # 従来のメモリアイテムからの情報
         memory_summary = ""
         if user_data.get('memory_items'):
             recent_memories = user_data['memory_items'][-20:]
-            memory_summary = "\n記憶している情報:\n"
+            memory_summary = "\n最近の記憶:\n"
             for item in recent_memories:
                 memory_summary += f"- {item['type']}: {item['content']}\n"
-        
+
+        # LangChainベースの関連記憶（重要度順）
+        relevant_memory_summary = ""
+        if relevant_memories:
+            relevant_memory_summary = "\n\n現在の会話に関連する重要な記憶（重要度が高い順）:\n"
+            for idx, memory in enumerate(relevant_memories[:5], 1):
+                relevant_memory_summary += f"{idx}. [{memory.memory_type}] {memory.content} (重要度: {memory.importance_score:.2f})\n"
+
         user_context = f"""
 ユーザー情報:
 - 名前: {user_data.get('name', '不明')}
@@ -214,8 +225,13 @@ async def chat_with_counselor(chat_message: ChatMessage):
 - 趣味: {', '.join(user_data.get('hobbies', [])) if user_data.get('hobbies') else '不明'}
 - その他の情報: {json.dumps(user_data.get('other_info', {}), ensure_ascii=False)}
 {memory_summary}
+{relevant_memory_summary}
 
-重要: 上記の記憶している情報を会話の中で自然に活用してください。ユーザーの過去の発言や状況を覚えていることを示し、継続的なサポートを提供してください。
+重要指示:
+- 上記の記憶を会話の中で**能動的かつ自然に**活用してください
+- 「～さんは以前〇〇とおっしゃっていましたね」「～について頑張っていますね」のように、こちらから記憶を参照してください
+- ユーザーが「私の名前は？」と聞かなくても、適切なタイミングで記憶している情報を使って声をかけてください
+- 過去の悩みや目標の進捗を気にかけ、継続的なサポートを示してください
 """
     
     recent_conversations = conversations[user_id][-10:] if conversations[user_id] else []
@@ -421,7 +437,18 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
                         current_data["memory_items"].append(memory_item)
                         updated = True
                         print(f"Added memory item: {field} = {field_value}")
-        
+
+                        # LangChain memory_systemにも保存
+                        await memory_system.store_memory(
+                            user_id=user_id,
+                            content=field_value,
+                            memory_type=field,
+                            metadata={
+                                "timestamp": datetime.now().isoformat(),
+                                "source": "conversation"
+                            }
+                        )
+
         # 基本情報の更新
         if extracted_info.get("name") and extracted_info["name"] != current_data.get("name"):
             current_data["name"] = extracted_info["name"]
@@ -433,6 +460,14 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
             }
             current_data["memory_items"].append(memory_item)
             updated = True
+
+            # LangChain memory_systemにも保存
+            await memory_system.store_memory(
+                user_id=user_id,
+                content=extracted_info["name"],
+                memory_type="name",
+                metadata={"timestamp": datetime.now().isoformat(), "source": "conversation"}
+            )
         
         if extracted_info.get("job") and extracted_info["job"] != current_data.get("job"):
             current_data["job"] = extracted_info["job"]
@@ -444,6 +479,14 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
             }
             current_data["memory_items"].append(memory_item)
             updated = True
+
+            # LangChain memory_systemにも保存
+            await memory_system.store_memory(
+                user_id=user_id,
+                content=extracted_info["job"],
+                memory_type="job",
+                metadata={"timestamp": datetime.now().isoformat(), "source": "conversation"}
+            )
         
         if extracted_info.get("hobbies") and isinstance(extracted_info["hobbies"], list):
             new_hobbies = [h for h in extracted_info["hobbies"] if h and h not in current_data["hobbies"]]
@@ -457,6 +500,14 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
                         "source": "conversation"
                     }
                     current_data["memory_items"].append(memory_item)
+
+                    # LangChain memory_systemにも保存
+                    await memory_system.store_memory(
+                        user_id=user_id,
+                        content=hobby,
+                        memory_type="hobby",
+                        metadata={"timestamp": datetime.now().isoformat(), "source": "conversation"}
+                    )
                 updated = True
         
         # メモリ制限（100個まで）
@@ -527,17 +578,50 @@ async def get_user_analytics(user_id: str):
     """Get user conversation analytics"""
     if user_id not in conversations:
         raise HTTPException(status_code=404, detail="User not found")
-    
+
     convs = conversations[user_id]
     pattern_counts = {1: 0, 2: 0, 3: 0}
-    
+
     for conv in convs:
         pattern = conv.get("response_pattern", 2)
         pattern_counts[pattern] += 1
-    
+
     return {
         "user_id": user_id,
         "total_conversations": len(convs),
         "pattern_distribution": pattern_counts,
         "recent_patterns": [conv.get("response_pattern", 2) for conv in convs[-10:]]
+    }
+
+@app.get("/api/memories/{user_id}")
+async def get_user_memories(user_id: str):
+    """Get LangChain-based user memories with importance scores"""
+    if user_id not in memory_system.memory_items:
+        return {
+            "user_id": user_id,
+            "memories": [],
+            "stats": memory_system.get_memory_stats(user_id)
+        }
+
+    memories = memory_system.memory_items[user_id]
+
+    # 重要度でソートして返す
+    sorted_memories = sorted(memories, key=lambda m: m.importance_score, reverse=True)
+
+    # MemoryItemをJSON形式に変換
+    memory_list = []
+    for memory in sorted_memories:
+        memory_list.append({
+            "id": memory.id,
+            "content": memory.content,
+            "memory_type": memory.memory_type,
+            "importance_score": memory.importance_score,
+            "timestamp": memory.timestamp.isoformat(),
+            "metadata": memory.metadata
+        })
+
+    return {
+        "user_id": user_id,
+        "memories": memory_list,
+        "stats": memory_system.get_memory_stats(user_id)
     }

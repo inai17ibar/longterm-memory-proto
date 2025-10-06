@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { MemoryDisplay } from './MemoryDisplay';
 
 function App() {
   const [currentMessage, setCurrentMessage] = useState('');
@@ -19,6 +20,14 @@ function App() {
       source: string;
     }>;
   } | null>(null);
+  const [langchainMemories, setLangchainMemories] = useState<Array<{
+    id: string;
+    content: string;
+    memory_type: string;
+    importance_score: number;
+    timestamp: string;
+    metadata: Record<string, any>;
+  }>>([]);
   const [isExporting, setIsExporting] = useState(false);
 
   const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
@@ -42,12 +51,21 @@ function App() {
       const response = await fetch(`${API_URL}/api/users/${uid}`);
       if (response.ok) {
         const userData = await response.json();
-        console.log('Loaded user data:', userData); // デバッグログ
-        console.log('Memory items count:', userData.memory_items?.length || 0); // デバッグログ
         setUserInfo(userData);
       }
     } catch (error) {
       console.log('No existing user data found');
+    }
+
+    // LangChain記憶を取得
+    try {
+      const memoryResponse = await fetch(`${API_URL}/api/memories/${uid}`);
+      if (memoryResponse.ok) {
+        const memoryData = await memoryResponse.json();
+        setLangchainMemories(memoryData.memories || []);
+      }
+    } catch (error) {
+      console.log('No LangChain memories found');
     }
   };
 
@@ -412,7 +430,7 @@ function App() {
             </div>
           </div>
 
-          {/* 記憶された情報カード */}
+          {/* 記憶された情報カード（LangChainベース） */}
           <div style={{
             background: 'white',
             borderRadius: '16px',
@@ -421,9 +439,11 @@ function App() {
             padding: '24px'
           }}>
             <h2 style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '16px' }}>
-              記憶された情報
+              🧠 記憶された情報（重要度順）
             </h2>
-            {userInfo ? (
+            {langchainMemories.length > 0 ? (
+              <MemoryDisplay memories={langchainMemories} userInfo={userInfo} />
+            ) : userInfo ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
                 {/* 基本情報セクション */}
                 <div style={{ padding: '12px', backgroundColor: '#f8fafc', borderRadius: '8px', border: '1px solid #e2e8f0' }}>
