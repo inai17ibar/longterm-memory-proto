@@ -9,6 +9,43 @@ interface Memory {
   metadata: Record<string, any>;
 }
 
+// 相対時間を計算する関数
+const getRelativeTime = (timestamp: string): string => {
+  const now = new Date();
+  const past = new Date(timestamp);
+  const diffMs = now.getTime() - past.getTime();
+  const diffMins = Math.floor(diffMs / (1000 * 60));
+  const diffHours = Math.floor(diffMs / (1000 * 60 * 60));
+  const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+  const diffWeeks = Math.floor(diffDays / 7);
+  const diffMonths = Math.floor(diffDays / 30);
+
+  if (diffMins < 1) return 'たった今';
+  if (diffMins < 60) return `${diffMins}分前`;
+  if (diffHours < 24) return `${diffHours}時間前`;
+  if (diffDays === 1) return '昨日';
+  if (diffDays < 7) return `${diffDays}日前`;
+  if (diffWeeks === 1) return '1週間前';
+  if (diffWeeks < 4) return `${diffWeeks}週間前`;
+  if (diffMonths === 1) return '1ヶ月前';
+  if (diffMonths < 12) return `${diffMonths}ヶ月前`;
+
+  const diffYears = Math.floor(diffDays / 365);
+  return `${diffYears}年前`;
+};
+
+// 正確な日時をフォーマットする関数
+const formatDateTime = (timestamp: string): string => {
+  const date = new Date(timestamp);
+  return date.toLocaleString('ja-JP', {
+    year: 'numeric',
+    month: '2-digit',
+    day: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
+};
+
 interface MemoryDisplayProps {
   memories: Memory[];
   userInfo: {
@@ -35,9 +72,14 @@ const categoryConfig: Record<string, { icon: string, label: string, bgColor: str
 };
 
 export const MemoryDisplay: React.FC<MemoryDisplayProps> = ({ memories, userInfo }) => {
+  // 記憶をタイムスタンプでソート（新しい順）
+  const sortedMemories = [...memories].sort((a, b) =>
+    new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime()
+  );
+
   // 記憶をタイプ別にグループ化
   const memoryByType: Record<string, Memory[]> = {};
-  memories.forEach(memory => {
+  sortedMemories.forEach(memory => {
     if (!memoryByType[memory.memory_type]) {
       memoryByType[memory.memory_type] = [];
     }
@@ -119,26 +161,39 @@ export const MemoryDisplay: React.FC<MemoryDisplayProps> = ({ memories, userInfo
                     fontSize: '14px',
                     color: config.textColor,
                     padding: '4px 0',
-                    whiteSpace: 'pre-wrap',
-                    display: 'flex',
-                    justifyContent: 'space-between',
-                    alignItems: 'flex-start'
+                    whiteSpace: 'pre-wrap'
                   }}
                 >
-                  <span>• {memory.content}</span>
-                  <span
-                    style={{
-                      fontSize: '11px',
-                      padding: '2px 6px',
-                      backgroundColor: 'rgba(0,0,0,0.1)',
-                      borderRadius: '4px',
-                      marginLeft: '8px',
-                      whiteSpace: 'nowrap'
-                    }}
-                    title={`重要度: ${(memory.importance_score * 100).toFixed(0)}%`}
-                  >
-                    {(memory.importance_score * 100).toFixed(0)}%
-                  </span>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                    <span>• {memory.content}</span>
+                    <div style={{ display: 'flex', gap: '6px', marginLeft: '8px', alignItems: 'center' }}>
+                      <span
+                        style={{
+                          fontSize: '10px',
+                          padding: '2px 6px',
+                          backgroundColor: 'rgba(0,0,0,0.05)',
+                          borderRadius: '4px',
+                          whiteSpace: 'nowrap',
+                          color: 'rgba(0,0,0,0.6)'
+                        }}
+                        title={formatDateTime(memory.timestamp)}
+                      >
+                        {getRelativeTime(memory.timestamp)}
+                      </span>
+                      <span
+                        style={{
+                          fontSize: '11px',
+                          padding: '2px 6px',
+                          backgroundColor: 'rgba(0,0,0,0.1)',
+                          borderRadius: '4px',
+                          whiteSpace: 'nowrap'
+                        }}
+                        title={`重要度: ${(memory.importance_score * 100).toFixed(0)}%`}
+                      >
+                        {(memory.importance_score * 100).toFixed(0)}%
+                      </span>
+                    </div>
+                  </div>
                 </div>
               ))}
             </div>
