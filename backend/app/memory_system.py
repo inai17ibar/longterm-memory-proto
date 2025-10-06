@@ -5,6 +5,7 @@ LangChainベースの高度な記憶システム
 import os
 import json
 import asyncio
+import sqlite3
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
@@ -146,26 +147,108 @@ class MemoryImportanceCalculator:
             return 0.2
 
 class LangChainMemorySystem:
-    """LangChainベースの高度な記憶システム"""
-    
-    def __init__(self, openai_api_key: Optional[str] = None):
+    """LangChainベースの高度な記憶システム（SQLite永続化対応）"""
+
+    def __init__(self, openai_api_key: Optional[str] = None, db_path: str = "./memories.db"):
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.vector_store = None
         self.embeddings = None
         self.llm = None
         self.memory_items: Dict[str, List[MemoryItem]] = {}
-        
+        self.db_path = db_path
+
+        # SQLiteデータベースを初期化
+        self._initialize_database()
+
+        # 既存の記憶を読み込み
+        self._load_memories_from_db()
+
         if LANGCHAIN_AVAILABLE and self.openai_api_key:
             self._initialize_langchain()
         else:
             print("Using fallback memory system")
     
+    def _initialize_database(self):
+        """SQLiteデータベースを初期化"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            CREATE TABLE IF NOT EXISTS memories (
+                id TEXT PRIMARY KEY,
+                user_id TEXT NOT NULL,
+                content TEXT NOT NULL,
+                memory_type TEXT NOT NULL,
+                importance_score REAL NOT NULL,
+                timestamp TEXT NOT NULL,
+                metadata TEXT NOT NULL
+            )
+        ''')
+
+        # インデックスを作成してパフォーマンス向上
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON memories(user_id)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_memory_type ON memories(memory_type)')
+        cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON memories(timestamp)')
+
+        conn.commit()
+        conn.close()
+        print(f"SQLite database initialized at {self.db_path}")
+
+    def _load_memories_from_db(self):
+        """データベースから記憶を読み込み"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('SELECT id, user_id, content, memory_type, importance_score, timestamp, metadata FROM memories')
+        rows = cursor.fetchall()
+
+        for row in rows:
+            memory_id, user_id, content, memory_type, importance_score, timestamp_str, metadata_str = row
+
+            memory_item = MemoryItem(
+                id=memory_id,
+                user_id=user_id,
+                content=content,
+                memory_type=memory_type,
+                importance_score=importance_score,
+                timestamp=datetime.fromisoformat(timestamp_str),
+                metadata=json.loads(metadata_str)
+            )
+
+            if user_id not in self.memory_items:
+                self.memory_items[user_id] = []
+            self.memory_items[user_id].append(memory_item)
+
+        conn.close()
+        print(f"Loaded {len(rows)} memories from database")
+
+    def _save_memory_to_db(self, memory: MemoryItem):
+        """単一の記憶をデータベースに保存"""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+
+        cursor.execute('''
+            INSERT OR REPLACE INTO memories (id, user_id, content, memory_type, importance_score, timestamp, metadata)
+            VALUES (?, ?, ?, ?, ?, ?, ?)
+        ''', (
+            memory.id,
+            memory.user_id,
+            memory.content,
+            memory.memory_type,
+            memory.importance_score,
+            memory.timestamp.isoformat(),
+            json.dumps(memory.metadata, ensure_ascii=False)
+        ))
+
+        conn.commit()
+        conn.close()
+
     def _initialize_langchain(self):
         """LangChainコンポーネントを初期化"""
         try:
             self.embeddings = OpenAIEmbeddings(openai_api_key=self.openai_api_key)
             self.llm = OpenAI(openai_api_key=self.openai_api_key, temperature=0.3)
-            
+
             # ChromaDBセットアップ
             self.vector_store = Chroma(
                 collection_name="user_memories",
@@ -177,17 +260,17 @@ class LangChainMemorySystem:
             print(f"Failed to initialize LangChain: {e}")
             LANGCHAIN_AVAILABLE = False
     
-    async def store_memory(self, user_id: str, content: str, memory_type: str, 
+    async def store_memory(self, user_id: str, content: str, memory_type: str,
                           metadata: Dict[str, Any] = None) -> str:
-        """記憶を保存"""
+        """記憶を保存（SQLiteに永続化）"""
         if metadata is None:
             metadata = {}
-        
+
         # 重要度を計算
         importance_score = MemoryImportanceCalculator.calculate_importance(
             content, memory_type, metadata
         )
-        
+
         # 記憶アイテムを作成
         memory_id = f"{user_id}_{datetime.now().isoformat()}_{memory_type}"
         memory_item = MemoryItem(
@@ -199,12 +282,15 @@ class LangChainMemorySystem:
             timestamp=datetime.now(),
             metadata=metadata
         )
-        
+
         # ユーザーの記憶リストに追加
         if user_id not in self.memory_items:
             self.memory_items[user_id] = []
         self.memory_items[user_id].append(memory_item)
-        
+
+        # SQLiteに保存（永続化）
+        self._save_memory_to_db(memory_item)
+
         # ベクトルストアに保存（LangChain使用時）
         if LANGCHAIN_AVAILABLE and self.vector_store:
             try:
@@ -222,10 +308,10 @@ class LangChainMemorySystem:
                 self.vector_store.add_documents([document])
             except Exception as e:
                 print(f"Failed to store in vector database: {e}")
-        
+
         # 記憶の制限管理（重要度の低いものから削除）
         await self._manage_memory_limit(user_id)
-        
+
         return memory_id
     
     async def retrieve_relevant_memories(self, user_id: str, query: str, 
@@ -292,21 +378,29 @@ class LangChainMemorySystem:
         return [memory for _, memory in scored_memories[:limit]]
     
     async def _manage_memory_limit(self, user_id: str, max_memories: int = 200):
-        """記憶の制限管理"""
+        """記憶の制限管理（SQLiteからも削除）"""
         if user_id not in self.memory_items:
             return
-        
+
         memories = self.memory_items[user_id]
         if len(memories) <= max_memories:
             return
-        
+
         # 重要度と時間でソート（重要度が高く、新しいものを優先）
         memories.sort(key=lambda m: (m.importance_score, m.timestamp), reverse=True)
-        
+
         # 制限を超えた分を削除
         removed_memories = memories[max_memories:]
         self.memory_items[user_id] = memories[:max_memories]
-        
+
+        # SQLiteからも削除
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
+        for memory in removed_memories:
+            cursor.execute('DELETE FROM memories WHERE id = ?', (memory.id,))
+        conn.commit()
+        conn.close()
+
         # ベクトルストアからも削除
         if LANGCHAIN_AVAILABLE and self.vector_store:
             try:
