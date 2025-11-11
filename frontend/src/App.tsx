@@ -219,10 +219,10 @@ function App() {
             </h2>
             
             {/* チャットエリア */}
-            <div style={{ 
-              height: '320px', 
-              border: '1px solid #e5e7eb', 
-              borderRadius: '8px', 
+            <div style={{
+              height: '500px',
+              border: '1px solid #e5e7eb',
+              borderRadius: '8px',
               marginBottom: '16px',
               padding: '16px',
               backgroundColor: '#f9fafb',
