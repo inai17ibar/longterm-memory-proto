@@ -31,10 +31,35 @@ class MemoryItem:
     user_id: str
     content: str
     memory_type: str  # emotional_state, goals, symptoms, etc.
-    importance_score: float  # 0.0 - 1.0
+    importance_score: float  # 0.0 - 1.0（保存時の基本重要度）
     timestamp: datetime
     metadata: Dict[str, Any]
     embedding_vector: Optional[List[float]] = None
+
+    def get_current_importance(self) -> float:
+        """時間減衰を考慮した現在の重要度を取得"""
+        days_ago = (datetime.now() - self.timestamp).days
+
+        # 時間減衰係数（エビングハウスの忘却曲線に近い形）
+        if days_ago == 0:
+            decay_factor = 1.0  # 今日: 減衰なし
+        elif days_ago <= 1:
+            decay_factor = 0.95  # 1日: 5%減衰
+        elif days_ago <= 7:
+            decay_factor = 0.85  # 1週間: 15%減衰
+        elif days_ago <= 30:
+            decay_factor = 0.65  # 1ヶ月: 35%減衰
+        elif days_ago <= 90:
+            decay_factor = 0.45  # 3ヶ月: 55%減衰
+        else:
+            decay_factor = 0.25  # 3ヶ月以上: 75%減衰
+
+        # 一部の記憶タイプは減衰しにくい（慢性的な症状や目標など）
+        persistent_types = ['symptoms', 'goals', 'medication', 'personality', 'work_status']
+        if self.memory_type in persistent_types:
+            decay_factor = max(decay_factor, 0.7)  # 最低でも70%は維持
+
+        return self.importance_score * decay_factor
 
 class MemoryImportanceCalculator:
     """記憶の重要度を計算するクラス"""
@@ -70,28 +95,44 @@ class MemoryImportanceCalculator:
         """記憶の重要度を計算"""
         if metadata is None:
             metadata = {}
-        
+
         # 基本重要度（記憶タイプベース）
         base_score = cls.TYPE_IMPORTANCE_WEIGHTS.get(memory_type, 0.5)
-        
+
         # 感情的な重要度
         emotional_score = cls._calculate_emotional_importance(content)
-        
+
         # 時間的な重要度（新しいほど重要）
         temporal_score = cls._calculate_temporal_importance(metadata.get('timestamp'))
-        
+
         # 文章の長さによる重要度
         length_score = cls._calculate_length_importance(content)
-        
-        # 最終スコア計算（重み付き平均）
-        final_score = (
-            base_score * 0.4 +
-            emotional_score * 0.3 +
-            temporal_score * 0.2 +
-            length_score * 0.1
-        )
-        
-        return min(max(final_score, 0.0), 1.0)
+
+        # 最終スコア計算（乗算方式で差を強調）
+        # base_scoreをベースに、他の要素で調整
+        multiplier = 1.0
+
+        # 感情スコアが高い場合は大幅に重要度を上げる
+        if emotional_score >= 0.9:
+            multiplier *= 1.5
+        elif emotional_score >= 0.6:
+            multiplier *= 1.2
+        elif emotional_score <= 0.3:
+            multiplier *= 0.7
+
+        # 新しい記憶は重要度を上げる
+        if temporal_score >= 0.8:
+            multiplier *= 1.3
+        elif temporal_score <= 0.3:
+            multiplier *= 0.6
+
+        # 長い文章は詳細情報として重要度を上げる
+        if length_score >= 0.8:
+            multiplier *= 1.1
+
+        final_score = base_score * multiplier
+
+        return min(max(final_score, 0.1), 1.0)
     
     @classmethod
     def _calculate_emotional_importance(cls, content: str) -> float:

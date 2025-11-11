@@ -32,6 +32,19 @@ app.add_middleware(
 user_memory: Dict[str, Dict[str, Any]] = {}
 conversations: Dict[str, List[Dict[str, Any]]] = {}
 
+# ユーザー状態管理（感情・ニーズ・モード）
+# スキーマ:
+# {
+#   "mood": 0-10 (全体的な気分),
+#   "energy": 0-10 (エネルギー・やる気),
+#   "anxiety": 0-10 (不安の強さ),
+#   "main_topics": ["テーマ1", "テーマ2"],
+#   "need": "共感してほしい / 解決のヒント / 話を整理したい 等",
+#   "modes": ["empathy", "emotion_labeling", ...],  # このターンで優先するカウンセリングモード
+#   "state_comment": "状態の簡単な説明"
+# }
+user_states: Dict[str, Dict[str, Any]] = {}
+
 client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class UserInfo(BaseModel):
@@ -50,6 +63,120 @@ class ChatResponse(BaseModel):
     response: str
     response_type: int  # 1, 2, 3のどのパターンか
     user_info_updated: bool = False
+
+async def analyze_user_state(
+    user_id: str,
+    user_message: str,
+    recent_conversations: List[Dict[str, Any]],
+    relevant_memories: List[MemoryItem]
+) -> Dict[str, Any]:
+    """
+    ユーザーの現在の感情・ニーズ・推奨モードをLLMで推定して user_states に保存する
+    """
+    # 会話の簡易要約を渡す（長くしすぎない）
+    history_summary = ""
+    if recent_conversations:
+        last_few = recent_conversations[-5:]
+        for conv in last_few:
+            history_summary += f"ユーザー: {conv['user_message']}\nカウンセラー: {conv['ai_response']}\n"
+
+    # 関連記憶も少しだけ
+    relevant_summary = ""
+    if relevant_memories:
+        for m in relevant_memories[:3]:
+            relevant_summary += f"- [{m.memory_type}] {m.content}\n"
+
+    prompt = f"""
+あなたはメンタルヘルスカウンセリングの専門家です。
+以下の情報から、ユーザーの現在の状態を分析し、JSON形式で返してください。
+
+【現在の発言】
+{user_message}
+
+【直近の会話（最大5ターン）】
+{history_summary}
+
+【関連する記憶（最大3件）】
+{relevant_summary}
+
+以下のフォーマットで、日本語の自由記述を含むJSONを返してください（推測しすぎず、書かれていないことは null）。
+
+{{
+  "mood": 0～10の整数（全体的な気分。よくわからなければ null）,
+  "energy": 0～10の整数（エネルギー・やる気。よくわからなければ null）,
+  "anxiety": 0～10の整数（不安の強さ。よくわからなければ null）,
+  "main_topics": ["主なテーマ1", "主なテーマ2"],
+  "need": "今ユーザーが一番求めていそうなこと（例: 共感してほしい、解決のヒントがほしい、ただ聞いてほしい 等）",
+  "modes": [
+    "empathy",           // 共感・受容
+    "emotion_labeling",  // 感情の言語化を助ける
+    "problem_sorting",   // 問題の整理
+    "small_action",      // 小さな行動の提案
+    "psychoeducation"    // 情報提供・解説
+  ] の中から2つ程度を選んで並べる,
+  "state_comment": "状態の簡単な説明（1〜2文）"
+}}
+"""
+
+    try:
+        if not os.getenv("OPENAI_API_KEY"):
+            # モック状態推定
+            state = {
+                "mood": 5,
+                "energy": 5,
+                "anxiety": 5,
+                "main_topics": ["メンタルヘルス"],
+                "need": "共感してほしい",
+                "modes": ["empathy", "emotion_labeling"],
+                "state_comment": "現在の状態を分析中です"
+            }
+        else:
+            response = client.chat.completions.create(
+                model="gpt-4o-mini",
+                messages=[
+                    {"role": "system", "content": "あなたはメンタルヘルスの状態を分析するアシスタントです。JSONのみで返答してください。"},
+                    {"role": "user", "content": prompt}
+                ],
+                max_tokens=400,
+                temperature=0.2
+            )
+
+            text = response.choices[0].message.content.strip()
+            if text.startswith("```"):
+                # ```json ... ``` を剥がす
+                text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
+                text = re.sub(r"\n?```$", "", text)
+
+            try:
+                state = json.loads(text)
+            except json.JSONDecodeError:
+                state = {
+                    "mood": None,
+                    "energy": None,
+                    "anxiety": None,
+                    "main_topics": [],
+                    "need": "不明",
+                    "modes": ["empathy"],
+                    "state_comment": ""
+                }
+
+        user_states[user_id] = state
+        return state
+
+    except Exception as e:
+        print(f"Error in analyze_user_state: {e}")
+        # デフォルト状態を返す
+        default_state = {
+            "mood": None,
+            "energy": None,
+            "anxiety": None,
+            "main_topics": [],
+            "need": "共感してほしい",
+            "modes": ["empathy"],
+            "state_comment": ""
+        }
+        user_states[user_id] = default_state
+        return default_state
 
 def analyze_response_pattern(user_message: str, conversation_history: List[Dict]) -> int:
     """ユーザーメッセージを分析して、回答パターン(1,2,3)を判断する"""
@@ -80,13 +207,25 @@ def analyze_response_pattern(user_message: str, conversation_history: List[Dict]
 
 def generate_system_prompt(user_context: str, conversation_context: str, response_pattern: int) -> str:
     """回答パターンに応じたシステムプロンプトを生成"""
-    
+
     base_prompt = f"""あなたは「メンタルバリアフリー」というビジョンを持つAIメンタルカウンセラーです。
 
 ## あなたのビジョンと基本スタンス
 - 不安や悩みを抱える人の感情も、それが個性であると捉えてください
 - 無理に更生させようとせず、あなた自身がユーザーに合わせて変わってください
 - ユーザーにとって「ここでは自分らしくいられる」「居心地が良い」場所を提供してください
+
+## 会話モード
+user_context内には「このターンで優先したいモード」が含まれます。
+modesに含まれるものを優先して使ってください：
+
+- empathy: 共感・受容を前面に出し、「わかってもらえた感」を最優先にする
+- emotion_labeling: ユーザーの感情に名前をつけてあげる（不安、悲しみ、怒り、戸惑い など）
+- problem_sorting: 状況を一緒に整理し、「何が起きているか」を一緒に言語化する
+- small_action: 今日〜数日のあいだにできそうな、負担の小さい行動を一緒に考える
+- psychoeducation: 必要に応じて、メンタルヘルスに関する情報や考え方のヒントを優しく共有する
+
+必ずしも全部を使う必要はありません。modesに含まれる2つを中心にしてください。
 
 ## 制約条件
 - うつ病で休職中のユーザや復職を目指している方、その他メンタルヘルスに関する方を主な対象とします
@@ -199,6 +338,15 @@ async def chat_with_counselor(chat_message: ChatMessage):
     # LangChainベースの記憶システムから関連する記憶を検索
     relevant_memories = await memory_system.retrieve_relevant_memories(user_id, message, limit=10)
 
+    # ★ ユーザー状態の分析（メタ推論ステップ）
+    recent_conversations = conversations[user_id][-10:] if conversations[user_id] else []
+    user_state = await analyze_user_state(
+        user_id=user_id,
+        user_message=message,
+        recent_conversations=recent_conversations,
+        relevant_memories=relevant_memories
+    )
+
     user_context = ""
     if user_id in user_memory:
         user_data = user_memory[user_id]
@@ -211,12 +359,32 @@ async def chat_with_counselor(chat_message: ChatMessage):
             for item in recent_memories:
                 memory_summary += f"- {item['type']}: {item['content']}\n"
 
-        # LangChainベースの関連記憶（重要度順）
+        # LangChainベースの関連記憶（時間減衰を考慮した重要度順）
         relevant_memory_summary = ""
         if relevant_memories:
-            relevant_memory_summary = "\n\n現在の会話に関連する重要な記憶（重要度が高い順）:\n"
-            for idx, memory in enumerate(relevant_memories[:5], 1):
-                relevant_memory_summary += f"{idx}. [{memory.memory_type}] {memory.content} (重要度: {memory.importance_score:.2f})\n"
+            # 時間減衰を考慮した重要度で再ソート
+            sorted_memories = sorted(relevant_memories, key=lambda m: m.get_current_importance(), reverse=True)
+
+            relevant_memory_summary = "\n\n現在の会話に関連する重要な記憶（時間減衰を考慮した重要度順）:\n"
+            for idx, memory in enumerate(sorted_memories[:5], 1):
+                days_ago = (datetime.now() - memory.timestamp).days
+                current_importance = memory.get_current_importance()
+                time_info = f"{days_ago}日前" if days_ago > 0 else "今日"
+                relevant_memory_summary += f"{idx}. [{memory.memory_type}] {memory.content}\n   (保存時: {memory.importance_score:.2f} → 現在: {current_importance:.2f}, {time_info})\n"
+
+        # ★ 状態情報の追加
+        state_text = ""
+        if user_state:
+            state_text = f"""
+推定される現在の状態:
+- 気分(mood): {user_state.get('mood')}
+- エネルギー(energy): {user_state.get('energy')}
+- 不安(anxiety): {user_state.get('anxiety')}
+- 主なテーマ: {', '.join(user_state.get('main_topics', []))}
+- いま求めていそうなこと: {user_state.get('need')}
+- このターンで優先したいモード: {', '.join(user_state.get('modes', []))}
+- 状態コメント: {user_state.get('state_comment')}
+"""
 
         user_context = f"""
 ユーザー情報:
@@ -226,6 +394,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
 - その他の情報: {json.dumps(user_data.get('other_info', {}), ensure_ascii=False)}
 {memory_summary}
 {relevant_memory_summary}
+{state_text}
 
 重要指示:
 - 上記の記憶を会話の中で**能動的かつ自然に**活用してください
@@ -605,17 +774,22 @@ async def get_user_memories(user_id: str):
 
     memories = memory_system.memory_items[user_id]
 
-    # 重要度でソートして返す
-    sorted_memories = sorted(memories, key=lambda m: m.importance_score, reverse=True)
+    # 時間減衰を考慮した現在の重要度でソートして返す
+    sorted_memories = sorted(memories, key=lambda m: m.get_current_importance(), reverse=True)
 
     # MemoryItemをJSON形式に変換
     memory_list = []
     for memory in sorted_memories:
+        days_ago = (datetime.now() - memory.timestamp).days
+        current_importance = memory.get_current_importance()
+
         memory_list.append({
             "id": memory.id,
             "content": memory.content,
             "memory_type": memory.memory_type,
-            "importance_score": memory.importance_score,
+            "importance_score_original": memory.importance_score,  # 保存時の重要度
+            "importance_score_current": current_importance,  # 時間減衰後の現在の重要度
+            "days_ago": days_ago,
             "timestamp": memory.timestamp.isoformat(),
             "metadata": memory.metadata
         })
