@@ -15,6 +15,8 @@ import asyncio
 
 # LangChain記憶システムをインポート
 from .memory_system import memory_system, MemoryItem
+# RAG知識ベースシステムをインポート
+from .knowledge_base import knowledge_base, KnowledgeItem
 
 load_dotenv()
 
@@ -181,27 +183,40 @@ async def analyze_user_state(
 def analyze_response_pattern(user_message: str, conversation_history: List[Dict]) -> int:
     """ユーザーメッセージを分析して、回答パターン(1,2,3)を判断する"""
     message = user_message.strip().lower()
-    
-    # パターン1: 短い返事や話の途中
-    short_responses = ['はい', 'うん', 'そう', 'まあ', 'うーん', 'あー', 'えー', '...', '。', 'そうですね']
-    if (len(message) <= 10 and any(resp in message for resp in short_responses)) or message.endswith('...'):
-        return 1
-    
-    # 最近の会話履歴をチェック
-    if len(conversation_history) >= 2:
+
+    # 最近のAIの応答を確認
+    last_ai_response = ""
+    if conversation_history:
         last_ai_response = conversation_history[-1].get('ai_response', '')
-        if '？' in last_ai_response or '?' in last_ai_response:
-            # 前回質問していて、短い回答の場合
-            if len(message) <= 15:
-                return 1
-    
+
     # パターン3: 解決策を求めているか、具体的な悩みを表現している
     solution_keywords = ['どうすれば', 'どうしたら', 'どうやって', '方法', '解決', 'アドバイス', '助け', 'わからない']
     problem_keywords = ['困って', '悩んで', '辛い', '苦しい', 'もうだめ', '限界', '疲れた', 'ストレス', '不安', '心配']
-    
+
     if any(keyword in message for keyword in solution_keywords + problem_keywords):
         return 3
-    
+
+    # 短い肯定的な返答（「はい」「うん」など）の判定
+    affirmative_responses = ['はい', 'うん', 'そう', 'いいです', 'お願い', 'そうですね', 'ええ']
+    is_affirmative = any(resp in message for resp in affirmative_responses)
+
+    # AIが提案や具体的な質問をした直後の「はい」は、パターン2（具体的な展開）にする
+    if is_affirmative and len(message) <= 10:
+        # AIが「〜しませんか？」「〜考えてみませんか？」などの提案をしていた場合
+        proposal_keywords = ['ませんか', '考えて', '試して', '工夫', '一緒に', 'できそう', '方法']
+        if any(keyword in last_ai_response for keyword in proposal_keywords):
+            return 2  # 具体的な展開を期待
+
+    # パターン1: 短い返事や話の途中（相槌のみ）
+    # より厳密に：単なる相槌や「...」で終わる場合のみ
+    minimal_responses = ['うーん', 'あー', 'えー', 'まあ', 'ん']
+    if (len(message) <= 5 and any(resp == message for resp in minimal_responses)) or message.endswith('...'):
+        return 1
+
+    # 前回質問していて、ごく短い回答（3文字以下）の場合のみパターン1
+    if ('？' in last_ai_response or '?' in last_ai_response) and len(message) <= 3:
+        return 1
+
     # デフォルトはパターン2（傾聴）
     return 2
 
@@ -347,6 +362,9 @@ async def chat_with_counselor(chat_message: ChatMessage):
         relevant_memories=relevant_memories
     )
 
+    # ★ RAG: 知識ベースから関連知識を検索
+    relevant_knowledge = knowledge_base.search_knowledge(message, limit=3)
+
     user_context = ""
     if user_id in user_memory:
         user_data = user_memory[user_id]
@@ -386,6 +404,13 @@ async def chat_with_counselor(chat_message: ChatMessage):
 - 状態コメント: {user_state.get('state_comment')}
 """
 
+        # ★ RAG: 関連知識の要約を追加
+        knowledge_summary = ""
+        if relevant_knowledge:
+            knowledge_summary = "\n\n関連する専門知識（参考情報）:\n"
+            for idx, knowledge in enumerate(relevant_knowledge, 1):
+                knowledge_summary += f"{idx}. 【{knowledge.title}】\n   {knowledge.content[:200]}...\n"
+
         user_context = f"""
 ユーザー情報:
 - 名前: {user_data.get('name', '不明')}
@@ -395,12 +420,14 @@ async def chat_with_counselor(chat_message: ChatMessage):
 {memory_summary}
 {relevant_memory_summary}
 {state_text}
+{knowledge_summary}
 
 重要指示:
 - 上記の記憶を会話の中で**能動的かつ自然に**活用してください
 - 「～さんは以前〇〇とおっしゃっていましたね」「～について頑張っていますね」のように、こちらから記憶を参照してください
 - ユーザーが「私の名前は？」と聞かなくても、適切なタイミングで記憶している情報を使って声をかけてください
 - 過去の悩みや目標の進捗を気にかけ、継続的なサポートを示してください
+- 関連する専門知識がある場合は、それを自然に会話に織り込んでください（専門用語の押し付けは避ける）
 """
     
     recent_conversations = conversations[user_id][-10:] if conversations[user_id] else []
@@ -798,4 +825,48 @@ async def get_user_memories(user_id: str):
         "user_id": user_id,
         "memories": memory_list,
         "stats": memory_system.get_memory_stats(user_id)
+    }
+
+@app.get("/api/knowledge")
+async def get_all_knowledge(category: Optional[str] = None):
+    """全知識ベースを取得"""
+    items = knowledge_base.get_all_knowledge(category=category)
+
+    knowledge_list = []
+    for item in items:
+        knowledge_list.append({
+            "id": item.id,
+            "category": item.category,
+            "title": item.title,
+            "content": item.content,
+            "tags": item.tags,
+            "relevance_keywords": item.relevance_keywords,
+            "created_at": item.created_at
+        })
+
+    return {
+        "knowledge": knowledge_list,
+        "stats": knowledge_base.get_stats()
+    }
+
+@app.get("/api/knowledge/search")
+async def search_knowledge(query: str, category: Optional[str] = None, limit: int = 5):
+    """知識を検索"""
+    items = knowledge_base.search_knowledge(query, category=category, limit=limit)
+
+    knowledge_list = []
+    for item in items:
+        knowledge_list.append({
+            "id": item.id,
+            "category": item.category,
+            "title": item.title,
+            "content": item.content,
+            "tags": item.tags,
+            "relevance_keywords": item.relevance_keywords,
+            "created_at": item.created_at
+        })
+
+    return {
+        "query": query,
+        "knowledge": knowledge_list
     }

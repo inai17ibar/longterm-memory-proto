@@ -91,5 +91,6 @@ frontend/package-lock.json
 
 # Database files
 backend/memories.db
+backend/knowledge_base.db
 backend/*.db
 chroma_db/
