@@ -4,7 +4,9 @@ interface Memory {
   id: string;
   content: string;
   memory_type: string;
-  importance_score: number;
+  importance_score_original: number;  // 保存時の重要度
+  importance_score_current: number;   // 時間減衰後の現在の重要度
+  days_ago: number;
   timestamp: string;
   metadata: Record<string, any>;
 }
@@ -188,9 +190,9 @@ export const MemoryDisplay: React.FC<MemoryDisplayProps> = ({ memories, userInfo
                           borderRadius: '4px',
                           whiteSpace: 'nowrap'
                         }}
-                        title={`重要度: ${(memory.importance_score * 100).toFixed(0)}%`}
+                        title={`保存時: ${(memory.importance_score_original * 100).toFixed(0)}% → 現在: ${(memory.importance_score_current * 100).toFixed(0)}% (${memory.days_ago}日前)`}
                       >
-                        {(memory.importance_score * 100).toFixed(0)}%
+                        {(memory.importance_score_current * 100).toFixed(0)}%
                       </span>
                     </div>
                   </div>

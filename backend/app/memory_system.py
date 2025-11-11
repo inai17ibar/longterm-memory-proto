@@ -117,11 +117,13 @@ class MemoryImportanceCalculator:
             multiplier *= 1.5
         elif emotional_score >= 0.6:
             multiplier *= 1.2
+        elif emotional_score <= 0.4:
+            multiplier *= 0.7  # 「少し〜」などの弱い表現
         elif emotional_score <= 0.3:
-            multiplier *= 0.7
+            multiplier *= 0.5  # 非常に弱い表現
 
-        # 新しい記憶は重要度を上げる
-        if temporal_score >= 0.8:
+        # 新しい記憶は重要度を上げる（ただし感情スコアが低い場合は控えめに）
+        if temporal_score >= 0.8 and emotional_score >= 0.5:
             multiplier *= 1.3
         elif temporal_score <= 0.3:
             multiplier *= 0.6
@@ -138,17 +140,24 @@ class MemoryImportanceCalculator:
     def _calculate_emotional_importance(cls, content: str) -> float:
         """感情的な重要度を計算"""
         content_lower = content.lower()
-        
+
         high_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS['high'] if word in content_lower)
         medium_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS['medium'] if word in content_lower)
         low_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS['low'] if word in content_lower)
-        
+
+        # 弱める表現があれば、感情強度を下げる
+        if low_count > 0:
+            if high_count > 0:
+                return 0.6  # 「少し不安」など
+            elif medium_count > 0:
+                return 0.4  # 「少し心配」など
+            else:
+                return 0.3  # 「少し気になる」など
+
         if high_count > 0:
             return 0.9
         elif medium_count > 0:
             return 0.6
-        elif low_count > 0:
-            return 0.3
         else:
             return 0.5
     

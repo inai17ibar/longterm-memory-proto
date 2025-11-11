@@ -24,7 +24,9 @@ function App() {
     id: string;
     content: string;
     memory_type: string;
-    importance_score: number;
+    importance_score_original: number;
+    importance_score_current: number;
+    days_ago: number;
     timestamp: string;
     metadata: Record<string, any>;
   }>>([]);
