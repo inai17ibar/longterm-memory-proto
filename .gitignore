@@ -88,3 +88,8 @@ frontend/package-lock.json
 *.backup
 *.original
 *.orig
+
+# Database files
+backend/memories.db
+backend/*.db
+chroma_db/
