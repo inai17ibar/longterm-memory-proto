@@ -17,6 +17,10 @@ import asyncio
 from .memory_system import memory_system, MemoryItem
 # RAG知識ベースシステムをインポート
 from .knowledge_base import knowledge_base, KnowledgeItem
+# ユーザープロファイルシステムをインポート
+from .user_profile import user_profile_system, UserProfile
+# 分析・推論層をインポート
+from .analysis_layer import analysis_layer
 
 load_dotenv()
 
@@ -74,111 +78,22 @@ async def analyze_user_state(
 ) -> Dict[str, Any]:
     """
     ユーザーの現在の感情・ニーズ・推奨モードをLLMで推定して user_states に保存する
+    新しい分析層とプロファイルシステムを使用
     """
-    # 会話の簡易要約を渡す（長くしすぎない）
-    history_summary = ""
-    if recent_conversations:
-        last_few = recent_conversations[-5:]
-        for conv in last_few:
-            history_summary += f"ユーザー: {conv['user_message']}\nカウンセラー: {conv['ai_response']}\n"
+    # ユーザープロファイルを取得
+    user_profile = user_profile_system.get_profile(user_id)
 
-    # 関連記憶も少しだけ
-    relevant_summary = ""
-    if relevant_memories:
-        for m in relevant_memories[:3]:
-            relevant_summary += f"- [{m.memory_type}] {m.content}\n"
+    # 分析層を使用して状態推定
+    state = await analysis_layer.analyze_user_state(
+        user_id=user_id,
+        user_message=user_message,
+        user_profile=user_profile,
+        recent_conversations=recent_conversations,
+        relevant_memories=relevant_memories
+    )
 
-    prompt = f"""
-あなたはメンタルヘルスカウンセリングの専門家です。
-以下の情報から、ユーザーの現在の状態を分析し、JSON形式で返してください。
-
-【現在の発言】
-{user_message}
-
-【直近の会話（最大5ターン）】
-{history_summary}
-
-【関連する記憶（最大3件）】
-{relevant_summary}
-
-以下のフォーマットで、日本語の自由記述を含むJSONを返してください（推測しすぎず、書かれていないことは null）。
-
-{{
-  "mood": 0～10の整数（全体的な気分。よくわからなければ null）,
-  "energy": 0～10の整数（エネルギー・やる気。よくわからなければ null）,
-  "anxiety": 0～10の整数（不安の強さ。よくわからなければ null）,
-  "main_topics": ["主なテーマ1", "主なテーマ2"],
-  "need": "今ユーザーが一番求めていそうなこと（例: 共感してほしい、解決のヒントがほしい、ただ聞いてほしい 等）",
-  "modes": [
-    "empathy",           // 共感・受容
-    "emotion_labeling",  // 感情の言語化を助ける
-    "problem_sorting",   // 問題の整理
-    "small_action",      // 小さな行動の提案
-    "psychoeducation"    // 情報提供・解説
-  ] の中から2つ程度を選んで並べる,
-  "state_comment": "状態の簡単な説明（1〜2文）"
-}}
-"""
-
-    try:
-        if not os.getenv("OPENAI_API_KEY"):
-            # モック状態推定
-            state = {
-                "mood": 5,
-                "energy": 5,
-                "anxiety": 5,
-                "main_topics": ["メンタルヘルス"],
-                "need": "共感してほしい",
-                "modes": ["empathy", "emotion_labeling"],
-                "state_comment": "現在の状態を分析中です"
-            }
-        else:
-            response = client.chat.completions.create(
-                model="gpt-4o-mini",
-                messages=[
-                    {"role": "system", "content": "あなたはメンタルヘルスの状態を分析するアシスタントです。JSONのみで返答してください。"},
-                    {"role": "user", "content": prompt}
-                ],
-                max_tokens=400,
-                temperature=0.2
-            )
-
-            text = response.choices[0].message.content.strip()
-            if text.startswith("```"):
-                # ```json ... ``` を剥がす
-                text = re.sub(r"^```[a-zA-Z]*\n?", "", text)
-                text = re.sub(r"\n?```$", "", text)
-
-            try:
-                state = json.loads(text)
-            except json.JSONDecodeError:
-                state = {
-                    "mood": None,
-                    "energy": None,
-                    "anxiety": None,
-                    "main_topics": [],
-                    "need": "不明",
-                    "modes": ["empathy"],
-                    "state_comment": ""
-                }
-
-        user_states[user_id] = state
-        return state
-
-    except Exception as e:
-        print(f"Error in analyze_user_state: {e}")
-        # デフォルト状態を返す
-        default_state = {
-            "mood": None,
-            "energy": None,
-            "anxiety": None,
-            "main_topics": [],
-            "need": "共感してほしい",
-            "modes": ["empathy"],
-            "state_comment": ""
-        }
-        user_states[user_id] = default_state
-        return default_state
+    user_states[user_id] = state
+    return state
 
 def analyze_response_pattern(user_message: str, conversation_history: List[Dict]) -> int:
     """ユーザーメッセージを分析して、回答パターン(1,2,3)を判断する"""
@@ -365,35 +280,88 @@ async def chat_with_counselor(chat_message: ChatMessage):
     # ★ RAG: 知識ベースから関連知識を検索
     relevant_knowledge = knowledge_base.search_knowledge(message, limit=3)
 
+    # ★ ユーザープロファイルを取得
+    user_profile = user_profile_system.get_profile(user_id)
+
     user_context = ""
+
+    # ★ プロファイル情報の構築
+    profile_summary = ""
+    if user_profile:
+        profile_parts = []
+        if user_profile.name:
+            profile_parts.append(f"名前: {user_profile.name}")
+        if user_profile.age:
+            profile_parts.append(f"年齢: {user_profile.age}")
+        if user_profile.job:
+            profile_parts.append(f"職業: {user_profile.job}")
+        if user_profile.hobbies:
+            profile_parts.append(f"趣味: {', '.join(user_profile.hobbies)}")
+        if user_profile.location:
+            profile_parts.append(f"住所: {user_profile.location}")
+        if user_profile.family:
+            profile_parts.append(f"家族: {user_profile.family}")
+
+        # メンタルヘルス情報
+        if user_profile.concerns:
+            profile_parts.append(f"現在の悩み: {user_profile.concerns}")
+        if user_profile.goals:
+            profile_parts.append(f"目標: {user_profile.goals}")
+        if user_profile.symptoms:
+            profile_parts.append(f"症状: {user_profile.symptoms}")
+        if user_profile.triggers:
+            profile_parts.append(f"ストレス要因: {user_profile.triggers}")
+        if user_profile.coping_methods:
+            profile_parts.append(f"対処法: {user_profile.coping_methods}")
+        if user_profile.support_system:
+            profile_parts.append(f"サポート体制: {user_profile.support_system}")
+        if user_profile.medication:
+            profile_parts.append(f"服薬・通院: {user_profile.medication}")
+        if user_profile.work_status:
+            profile_parts.append(f"勤務状況: {user_profile.work_status}")
+        if user_profile.daily_routine:
+            profile_parts.append(f"日常生活: {user_profile.daily_routine}")
+        if user_profile.emotional_state:
+            profile_parts.append(f"感情状態: {user_profile.emotional_state}")
+
+        if profile_parts:
+            profile_summary = "\nユーザープロファイル:\n" + "\n".join(f"- {p}" for p in profile_parts)
+
+    # 従来のメモリシステムも維持（後方互換性）
+    memory_summary = ""
     if user_id in user_memory:
         user_data = user_memory[user_id]
-
-        # 従来のメモリアイテムからの情報
-        memory_summary = ""
         if user_data.get('memory_items'):
-            recent_memories = user_data['memory_items'][-20:]
-            memory_summary = "\n最近の記憶:\n"
+            recent_memories = user_data['memory_items'][-10:]
+            memory_summary = "\n\n最近の記憶（旧システム）:\n"
             for item in recent_memories:
                 memory_summary += f"- {item['type']}: {item['content']}\n"
 
-        # LangChainベースの関連記憶（時間減衰を考慮した重要度順）
-        relevant_memory_summary = ""
-        if relevant_memories:
-            # 時間減衰を考慮した重要度で再ソート
-            sorted_memories = sorted(relevant_memories, key=lambda m: m.get_current_importance(), reverse=True)
+    # LangChainベースの関連記憶（時間減衰を考慮した重要度順）
+    relevant_memory_summary = ""
+    if relevant_memories:
+        # 時間減衰を考慮した重要度で再ソート
+        sorted_memories = sorted(relevant_memories, key=lambda m: m.get_current_importance(), reverse=True)
 
-            relevant_memory_summary = "\n\n現在の会話に関連する重要な記憶（時間減衰を考慮した重要度順）:\n"
-            for idx, memory in enumerate(sorted_memories[:5], 1):
-                days_ago = (datetime.now() - memory.timestamp).days
-                current_importance = memory.get_current_importance()
-                time_info = f"{days_ago}日前" if days_ago > 0 else "今日"
-                relevant_memory_summary += f"{idx}. [{memory.memory_type}] {memory.content}\n   (保存時: {memory.importance_score:.2f} → 現在: {current_importance:.2f}, {time_info})\n"
+        relevant_memory_summary = "\n\n現在の会話に関連する重要な記憶（時間減衰を考慮した重要度順）:\n"
+        for idx, memory in enumerate(sorted_memories[:5], 1):
+            days_ago = (datetime.now() - memory.timestamp).days
+            current_importance = memory.get_current_importance()
+            time_info = f"{days_ago}日前" if days_ago > 0 else "今日"
+            relevant_memory_summary += f"{idx}. [{memory.memory_type}] {memory.content}\n   (保存時: {memory.importance_score:.2f} → 現在: {current_importance:.2f}, {time_info})\n"
 
-        # ★ 状態情報の追加
-        state_text = ""
-        if user_state:
-            state_text = f"""
+    # ★ 状態情報の追加（文脈パターン分析を含む）
+    state_text = ""
+    if user_state:
+        contextual_info = ""
+        if user_state.get('contextual_patterns'):
+            patterns = user_state['contextual_patterns']
+            if patterns:
+                contextual_info = "\n文脈パターン:\n"
+                for key, value in patterns.items():
+                    contextual_info += f"  - {value}\n"
+
+        state_text = f"""
 推定される現在の状態:
 - 気分(mood): {user_state.get('mood')}
 - エネルギー(energy): {user_state.get('energy')}
@@ -402,32 +370,30 @@ async def chat_with_counselor(chat_message: ChatMessage):
 - いま求めていそうなこと: {user_state.get('need')}
 - このターンで優先したいモード: {', '.join(user_state.get('modes', []))}
 - 状態コメント: {user_state.get('state_comment')}
+{contextual_info}
 """
 
-        # ★ RAG: 関連知識の要約を追加
-        knowledge_summary = ""
-        if relevant_knowledge:
-            knowledge_summary = "\n\n関連する専門知識（参考情報）:\n"
-            for idx, knowledge in enumerate(relevant_knowledge, 1):
-                knowledge_summary += f"{idx}. 【{knowledge.title}】\n   {knowledge.content[:200]}...\n"
+    # ★ RAG: 関連知識の要約を追加
+    knowledge_summary = ""
+    if relevant_knowledge:
+        knowledge_summary = "\n\n関連する専門知識（参考情報）:\n"
+        for idx, knowledge in enumerate(relevant_knowledge, 1):
+            knowledge_summary += f"{idx}. 【{knowledge.title}】\n   {knowledge.content[:200]}...\n"
 
-        user_context = f"""
-ユーザー情報:
-- 名前: {user_data.get('name', '不明')}
-- 職業: {user_data.get('job', '不明')}
-- 趣味: {', '.join(user_data.get('hobbies', [])) if user_data.get('hobbies') else '不明'}
-- その他の情報: {json.dumps(user_data.get('other_info', {}), ensure_ascii=False)}
+    user_context = f"""
+{profile_summary}
 {memory_summary}
 {relevant_memory_summary}
 {state_text}
 {knowledge_summary}
 
 重要指示:
-- 上記の記憶を会話の中で**能動的かつ自然に**活用してください
+- 上記のプロファイル・記憶を会話の中で**能動的かつ自然に**活用してください
 - 「～さんは以前〇〇とおっしゃっていましたね」「～について頑張っていますね」のように、こちらから記憶を参照してください
 - ユーザーが「私の名前は？」と聞かなくても、適切なタイミングで記憶している情報を使って声をかけてください
 - 過去の悩みや目標の進捗を気にかけ、継続的なサポートを示してください
 - 関連する専門知識がある場合は、それを自然に会話に織り込んでください（専門用語の押し付けは避ける）
+- プロファイルに記録された症状やストレス要因を踏まえて、個別化された応答を心がけてください
 """
     
     recent_conversations = conversations[user_id][-10:] if conversations[user_id] else []
@@ -459,16 +425,26 @@ async def chat_with_counselor(chat_message: ChatMessage):
                 temperature=0.7
             )
             ai_response = response.choices[0].message.content
-        
+
         conversations[user_id].append({
             "user_message": message,
             "ai_response": ai_response,
             "response_pattern": response_pattern,
             "timestamp": datetime.now().isoformat()
         })
-        
+
+        # 旧システム：メモリアイテム抽出
         user_info_updated = await extract_user_info(user_id, message, ai_response)
-        
+
+        # ★ 新システム：プロファイルシステムで抽出・更新
+        profile_updated = await user_profile_system.extract_and_update_profile(
+            user_id=user_id,
+            user_message=message,
+            ai_response=ai_response
+        )
+
+        user_info_updated = user_info_updated or profile_updated
+
         return ChatResponse(
             response=ai_response,
             response_type=response_pattern,
@@ -490,9 +466,19 @@ async def chat_with_counselor(chat_message: ChatMessage):
             "response_pattern": response_pattern,
             "timestamp": datetime.now().isoformat()
         })
-        
+
+        # 旧システム：メモリアイテム抽出
         user_info_updated = await extract_user_info(user_id, message, ai_response)
-        
+
+        # ★ 新システム：プロファイルシステムで抽出・更新
+        profile_updated = await user_profile_system.extract_and_update_profile(
+            user_id=user_id,
+            user_message=message,
+            ai_response=ai_response
+        )
+
+        user_info_updated = user_info_updated or profile_updated
+
         return ChatResponse(
             response=ai_response,
             response_type=response_pattern,
@@ -869,4 +855,48 @@ async def search_knowledge(query: str, category: Optional[str] = None, limit: in
     return {
         "query": query,
         "knowledge": knowledge_list
+    }
+
+@app.get("/api/profile/{user_id}")
+async def get_user_profile(user_id: str):
+    """ユーザープロファイルを取得"""
+    profile = user_profile_system.get_profile(user_id)
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    return {
+        "user_id": user_id,
+        "profile": profile.to_dict()
+    }
+
+@app.get("/api/profile/{user_id}/summary")
+async def get_user_profile_summary(user_id: str):
+    """ユーザープロファイルの要約を取得"""
+    summary = user_profile_system.get_profile_summary(user_id)
+
+    return {
+        "user_id": user_id,
+        "summary": summary
+    }
+
+@app.delete("/api/profile/{user_id}")
+async def delete_user_profile(user_id: str):
+    """ユーザープロファイルを削除"""
+    deleted = user_profile_system.delete_profile(user_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    return {"message": "User profile deleted successfully"}
+
+@app.get("/api/state/{user_id}")
+async def get_user_state(user_id: str):
+    """ユーザーの現在の状態を取得"""
+    if user_id not in user_states:
+        raise HTTPException(status_code=404, detail="User state not found")
+
+    return {
+        "user_id": user_id,
+        "state": user_states[user_id]
     }

@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MemoryDisplay } from './MemoryDisplay';
+import { ProfileDebug } from './ProfileDebug';
 
 function App() {
   const [currentMessage, setCurrentMessage] = useState('');
@@ -32,7 +33,7 @@ function App() {
   }>>([]);
   const [isExporting, setIsExporting] = useState(false);
 
-  const API_URL = process.env.REACT_APP_API_URL || 'http://localhost:8001';
+  const API_URL = 'http://localhost:8001'; // process.env.REACT_APP_API_URL || 'http://localhost:8001';
 
   useEffect(() => {
     // ユーザーIDを生成または取得
@@ -750,6 +751,9 @@ function App() {
               </p>
             )}
           </div>
+
+          {/* プロファイル・デバッグ情報 */}
+          <ProfileDebug userId={userId} apiUrl={API_URL} />
 
           {/* 設定カード */}
           <div style={{
