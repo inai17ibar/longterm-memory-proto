@@ -93,6 +93,7 @@ frontend/package-lock.json
 backend/memories.db
 backend/knowledge_base.db
 backend/user_profiles.db
+backend/episodic_memory.db
 backend/app/*.db
 backend/*.db
 chroma_db/

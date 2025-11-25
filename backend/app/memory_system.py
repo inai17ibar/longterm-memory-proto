@@ -310,16 +310,90 @@ class LangChainMemorySystem:
             print(f"Failed to initialize LangChain: {e}")
             LANGCHAIN_AVAILABLE = False
     
+    def _is_quality_memory(self, content: str, memory_type: str, user_id: str) -> Tuple[bool, str]:
+        """
+        記憶の品質をチェック
+        Returns: (is_valid, reason)
+        """
+        # 最小文字数チェック
+        MIN_LENGTH = 5
+        if len(content.strip()) < MIN_LENGTH:
+            return False, f"短すぎる（{len(content)}文字 < {MIN_LENGTH}文字）"
+
+        # 意味のない記憶（単一単語のみ）をフィルタ
+        if len(content.split()) == 1 and len(content) < 10:
+            return False, "単一単語のみ"
+
+        # 重複チェック
+        if user_id in self.memory_items:
+            for existing_memory in self.memory_items[user_id]:
+                # 完全一致
+                if existing_memory.content.strip() == content.strip():
+                    return False, "完全重複"
+
+                # 高い類似度（90%以上同じ）
+                if (existing_memory.memory_type == memory_type and
+                    len(content) > 20 and
+                    self._similarity_ratio(existing_memory.content, content) > 0.9):
+                    return False, "類似重複（90%以上）"
+
+        # 情報量チェック（あまりに一般的すぎる表現を除外）
+        generic_patterns = ['はい', 'いいえ', 'そうです', 'ありがとう', 'よろしく']
+        if content.strip() in generic_patterns:
+            return False, "一般的すぎる表現"
+
+        return True, "OK"
+
+    def _similarity_ratio(self, s1: str, s2: str) -> float:
+        """2つの文字列の類似度を計算（簡易版）"""
+        s1_lower = s1.lower().strip()
+        s2_lower = s2.lower().strip()
+
+        if not s1_lower or not s2_lower:
+            return 0.0
+
+        # 共通部分の割合を計算
+        longer = max(len(s1_lower), len(s2_lower))
+        shorter = min(len(s1_lower), len(s2_lower))
+
+        # 簡易的な類似度（含まれる割合）
+        if s1_lower in s2_lower or s2_lower in s1_lower:
+            return shorter / longer
+
+        # 単語レベルの一致
+        words1 = set(s1_lower.split())
+        words2 = set(s2_lower.split())
+
+        if not words1 or not words2:
+            return 0.0
+
+        intersection = len(words1 & words2)
+        union = len(words1 | words2)
+
+        return intersection / union if union > 0 else 0.0
+
     async def store_memory(self, user_id: str, content: str, memory_type: str,
                           metadata: Dict[str, Any] = None) -> str:
-        """記憶を保存（SQLiteに永続化）"""
+        """記憶を保存（SQLiteに永続化）with品質フィルタリング"""
         if metadata is None:
             metadata = {}
+
+        # ★ 品質チェック
+        is_valid, reason = self._is_quality_memory(content, memory_type, user_id)
+        if not is_valid:
+            print(f"Memory rejected: {reason} - '{content[:50]}'")
+            return ""  # 空文字列を返して保存しない
 
         # 重要度を計算
         importance_score = MemoryImportanceCalculator.calculate_importance(
             content, memory_type, metadata
         )
+
+        # 低重要度記憶のフィルタリング（閾値以下は保存しない）
+        MIN_IMPORTANCE = 0.15
+        if importance_score < MIN_IMPORTANCE:
+            print(f"Memory rejected: Low importance ({importance_score:.2f}) - '{content[:50]}'")
+            return ""
 
         # 記憶アイテムを作成
         memory_id = f"{user_id}_{datetime.now().isoformat()}_{memory_type}"
@@ -337,6 +411,8 @@ class LangChainMemorySystem:
         if user_id not in self.memory_items:
             self.memory_items[user_id] = []
         self.memory_items[user_id].append(memory_item)
+
+        print(f"Memory stored: [{memory_type}] importance={importance_score:.2f} - '{content[:50]}'...")
 
         # SQLiteに保存（永続化）
         self._save_memory_to_db(memory_item)

@@ -21,6 +21,10 @@ from .knowledge_base import knowledge_base, KnowledgeItem
 from .user_profile import user_profile_system, UserProfile
 # 分析・推論層をインポート
 from .analysis_layer import analysis_layer
+# エピソード記憶システムをインポート
+from .episodic_memory import episodic_memory_system, Episode, EmotionRecord
+# 記憶の統合・関連性分析をインポート
+from .memory_consolidation import memory_consolidation, memory_relationship
 
 load_dotenv()
 
@@ -445,12 +449,40 @@ async def chat_with_counselor(chat_message: ChatMessage):
 
         user_info_updated = user_info_updated or profile_updated
 
+        # ★ エピソード記憶と感情履歴の記録
+        try:
+            # 感情履歴を記録
+            if user_state:
+                emotion_id = episodic_memory_system.record_emotion(
+                    user_id=user_id,
+                    mood=user_state.get('mood') or 5,
+                    energy=user_state.get('energy') or 5,
+                    anxiety=user_state.get('anxiety') or 5,
+                    primary_emotion=user_state.get('modes', ['neutral'])[0] if user_state.get('modes') else 'neutral',
+                    triggers=user_state.get('main_topics', []),
+                    notes=user_state.get('state_comment', '')
+                )
+                print(f"Emotion recorded: {emotion_id}")
+
+            # エピソード記憶を抽出（バックグラウンドで実行）
+            episode = await episodic_memory_system.extract_episode_from_conversation(
+                user_id=user_id,
+                user_message=message,
+                ai_response=ai_response,
+                current_emotion_state=user_state
+            )
+            if episode:
+                print(f"Episode recorded: {episode.title}")
+
+        except Exception as e:
+            print(f"Error recording episodic memory: {e}")
+
         return ChatResponse(
             response=ai_response,
             response_type=response_pattern,
             user_info_updated=user_info_updated
         )
-        
+
     except Exception as e:
         # Fallback to mock response if OpenAI API fails
         if response_pattern == 1:
@@ -899,4 +931,142 @@ async def get_user_state(user_id: str):
     return {
         "user_id": user_id,
         "state": user_states[user_id]
+    }
+
+@app.get("/api/episodes/{user_id}")
+async def get_user_episodes(
+    user_id: str,
+    limit: int = 20,
+    emotion_filter: Optional[str] = None,
+    days_ago: Optional[int] = None
+):
+    """ユーザーのエピソード記憶を取得"""
+    episodes = episodic_memory_system.get_episodes(
+        user_id=user_id,
+        limit=limit,
+        emotion_filter=emotion_filter,
+        days_ago=days_ago
+    )
+
+    return {
+        "user_id": user_id,
+        "episodes": [episode.to_dict() for episode in episodes],
+        "total": len(episodes)
+    }
+
+@app.get("/api/emotions/{user_id}")
+async def get_emotion_history(user_id: str, days: int = 30):
+    """ユーザーの感情履歴を取得"""
+    history = episodic_memory_system.get_emotion_history(user_id, days)
+
+    return {
+        "user_id": user_id,
+        "history": [{
+            "id": record.id,
+            "timestamp": record.timestamp.isoformat(),
+            "mood": record.mood,
+            "energy": record.energy,
+            "anxiety": record.anxiety,
+            "primary_emotion": record.primary_emotion,
+            "triggers": record.triggers,
+            "notes": record.notes
+        } for record in history],
+        "total": len(history)
+    }
+
+@app.get("/api/emotions/{user_id}/trends")
+async def get_emotion_trends(user_id: str, days: int = 7):
+    """ユーザーの感情トレンドを分析"""
+    trends = episodic_memory_system.analyze_emotion_trends(user_id, days)
+
+    return {
+        "user_id": user_id,
+        "trends": trends
+    }
+
+@app.get("/api/memories/{user_id}/summary")
+async def get_memory_summary(
+    user_id: str,
+    memory_type: Optional[str] = None,
+    days: int = 30
+):
+    """記憶の要約を取得"""
+    summary = await memory_consolidation.generate_memory_summary(
+        user_id=user_id,
+        memory_type=memory_type,
+        days=days
+    )
+
+    return {
+        "user_id": user_id,
+        "summary": summary
+    }
+
+@app.post("/api/memories/{user_id}/consolidate")
+async def consolidate_memories(
+    user_id: str,
+    memory_type: str,
+    similarity_threshold: float = 0.8
+):
+    """類似記憶を統合"""
+    consolidated = await memory_consolidation.consolidate_similar_memories(
+        user_id=user_id,
+        memory_type=memory_type,
+        similarity_threshold=similarity_threshold
+    )
+
+    return {
+        "user_id": user_id,
+        "memory_type": memory_type,
+        "consolidated": consolidated,
+        "count": len(consolidated)
+    }
+
+@app.get("/api/memories/{user_id}/graph")
+async def get_memory_graph(user_id: str):
+    """記憶の関連性グラフを取得"""
+    graph = await memory_relationship.generate_memory_graph(user_id)
+
+    return {
+        "user_id": user_id,
+        "graph": graph
+    }
+
+@app.get("/api/memories/{user_id}/{memory_id}/related")
+async def get_related_memories(user_id: str, memory_id: str, limit: int = 5):
+    """特定の記憶に関連する他の記憶を取得"""
+    # 対象の記憶を検索
+    if user_id not in memory_system.memory_items:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    target_memory = None
+    for memory in memory_system.memory_items[user_id]:
+        if memory.id == memory_id:
+            target_memory = memory
+            break
+
+    if not target_memory:
+        raise HTTPException(status_code=404, detail="Memory not found")
+
+    # 関連記憶を検索
+    related = memory_relationship.find_related_memories(
+        user_id=user_id,
+        target_memory=target_memory,
+        limit=limit
+    )
+
+    return {
+        "user_id": user_id,
+        "target_memory_id": memory_id,
+        "related_memories": [{
+            "memory": {
+                "id": mem.id,
+                "content": mem.content,
+                "type": mem.memory_type,
+                "importance": mem.importance_score,
+                "timestamp": mem.timestamp.isoformat()
+            },
+            "relationship_score": score,
+            "relationship_reason": reason
+        } for mem, score, reason in related]
     }

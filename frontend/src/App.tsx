@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { MemoryDisplay } from './MemoryDisplay';
 import { ProfileDebug } from './ProfileDebug';
+import { EmotionHistory } from './EmotionHistory';
+import { MemoryInsights } from './MemoryInsights';
 
 function App() {
   const [currentMessage, setCurrentMessage] = useState('');
@@ -754,6 +756,12 @@ function App() {
 
           {/* プロファイル・デバッグ情報 */}
           <ProfileDebug userId={userId} apiUrl={API_URL} />
+
+          {/* 感情履歴・エピソード記憶 */}
+          <EmotionHistory userId={userId} apiUrl={API_URL} />
+
+          {/* 記憶の統合・関連性 */}
+          <MemoryInsights userId={userId} apiUrl={API_URL} />
 
           {/* 設定カード */}
           <div style={{
