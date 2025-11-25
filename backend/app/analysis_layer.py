@@ -166,7 +166,7 @@ class AnalysisLayer:
         try:
             if not self.client:
                 # モック状態推定
-                return self._mock_state_estimation()
+                return self._mock_state_estimation(user_message)
 
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
@@ -188,24 +188,101 @@ class AnalysisLayer:
             try:
                 state = json.loads(text)
             except json.JSONDecodeError:
-                state = self._mock_state_estimation()
+                state = self._mock_state_estimation(user_message)
 
             return state
 
         except Exception as e:
             print(f"Error in analyze_user_state: {e}")
-            return self._mock_state_estimation()
+            return self._mock_state_estimation(user_message)
 
-    def _mock_state_estimation(self) -> Dict[str, Any]:
-        """モック状態推定"""
+    def _mock_state_estimation(self, user_message: str = "") -> Dict[str, Any]:
+        """モック状態推定（キーワード分析ベース）"""
+        # メッセージが渡されない場合は中立状態
+        if not user_message:
+            return {
+                "mood": 5,
+                "energy": 5,
+                "anxiety": 5,
+                "main_topics": ["メンタルヘルス"],
+                "need": "共感してほしい",
+                "modes": ["empathy", "emotion_labeling"],
+                "state_comment": "現在の状態を分析中です"
+            }
+
+        msg_lower = user_message.lower()
+
+        # 気分の推定
+        mood = 5
+        if any(word in msg_lower for word in ['嬉しい', '楽しい', '良い', '幸せ', 'いい']):
+            mood = 8
+        elif any(word in msg_lower for word in ['最高', '素晴らしい', '完璧']):
+            mood = 9
+        elif any(word in msg_lower for word in ['辛い', '苦しい', '悲しい', '悔しい', 'つらい']):
+            mood = 2
+        elif any(word in msg_lower for word in ['最悪', '何もしたくない', '無理']):
+            mood = 1
+        elif any(word in msg_lower for word in ['不安', '心配', '怖い', '怖れ']):
+            mood = 3
+        elif any(word in msg_lower for word in ['落ち着いた', 'リラックス']):
+            mood = 7
+
+        # エネルギーの推定
+        energy = 5
+        if any(word in msg_lower for word in ['全く動けない', '何もできない', '極度の疲労']):
+            energy = 1
+        elif any(word in msg_lower for word in ['疲れた', '疲れ', '眠い', '休みたい', '疲労']):
+            energy = 2
+        elif any(word in msg_lower for word in ['非常に活発', '躍起', 'やる気満々']):
+            energy = 9
+        elif any(word in msg_lower for word in ['頑張り', 'やる気', 'モチベ', 'やる', '楽しい', '楽しかった', '嬉しい']):
+            energy = 8
+        elif any(word in msg_lower for word in ['元気', 'いい感じ', '調子いい']):
+            energy = 7
+
+        # 不安度の推定
+        anxiety = 5
+        if any(word in msg_lower for word in ['極度の不安', 'パニック発作', '襲われた']):
+            anxiety = 10
+        elif any(word in msg_lower for word in ['全く不安がない', '穏やかそのもの']):
+            anxiety = 0
+        elif any(word in msg_lower for word in ['落ち着いた', 'リラックス', '穏やか', '平穏']):
+            anxiety = 2
+        elif any(word in msg_lower for word in ['不安', '心配', '怖い', 'パニック', 'ストレス', '緊張']):
+            anxiety = 8
+
+        # トピック抽出
+        topics = []
+        if any(word in msg_lower for word in ['仕事', '職場', '勤務', '業務']):
+            topics.append("仕事・職場")
+        if any(word in msg_lower for word in ['家族', '親', '両親']):
+            topics.append("家族関係")
+        if any(word in msg_lower for word in ['友人', '友達', '人間関係', '対人']):
+            topics.append("人間関係")
+        if any(word in msg_lower for word in ['睡眠', '眠り', '眠い', '不眠']):
+            topics.append("睡眠")
+        if any(word in msg_lower for word in ['恋愛', '恋人', 'パートナー']):
+            topics.append("恋愛")
+        if not topics:
+            topics = ["メンタルヘルス"]
+
+        # ニーズ推定
+        need = "共感してほしい"
+        if any(word in msg_lower for word in ['どうしたら', 'どうすれば', '対策', '対処', 'アドバイス']):
+            need = "解決のヒント・アドバイス"
+        if any(word in msg_lower for word in ['聞いて', '聴いて', '話したい', '吐き出したい']):
+            need = "話を聞いてほしい・受け入れてもらいたい"
+        if any(word in msg_lower for word in ['整理', '整りー', '何が問題か', '気持ちの整理']):
+            need = "気持ちや問題の整理"
+
         return {
-            "mood": 5,
-            "energy": 5,
-            "anxiety": 5,
-            "main_topics": ["メンタルヘルス"],
-            "need": "共感してほしい",
+            "mood": mood,
+            "energy": energy,
+            "anxiety": anxiety,
+            "main_topics": topics,
+            "need": need,
             "modes": ["empathy", "emotion_labeling"],
-            "state_comment": "現在の状態を分析中です"
+            "state_comment": f"会話内容から推定した状態（気分:{mood}, エネルギー:{energy}, 不安:{anxiety}）"
         }
 
     def _analyze_contextual_patterns(

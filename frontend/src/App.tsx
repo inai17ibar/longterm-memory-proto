@@ -3,6 +3,7 @@ import { MemoryDisplay } from './MemoryDisplay';
 import { ProfileDebug } from './ProfileDebug';
 import { EmotionHistory } from './EmotionHistory';
 import { MemoryInsights } from './MemoryInsights';
+import { ExpandableProfile } from './ExpandableProfile';
 
 function App() {
   const [currentMessage, setCurrentMessage] = useState('');
@@ -762,6 +763,9 @@ function App() {
 
           {/* 記憶の統合・関連性 */}
           <MemoryInsights userId={userId} apiUrl={API_URL} />
+
+          {/* 拡張型プロファイル・記憶管理 */}
+          <ExpandableProfile userId={userId} apiUrl={API_URL} />
 
           {/* 設定カード */}
           <div style={{

@@ -464,6 +464,14 @@ async def chat_with_counselor(chat_message: ChatMessage):
                 )
                 print(f"Emotion recorded: {emotion_id}")
 
+                # ユーザープロファイルの状態を更新
+                user_profile_system.update_user_state(
+                    user_id=user_id,
+                    mood=user_state.get('mood') or 5,
+                    energy=user_state.get('energy') or 5,
+                    anxiety=user_state.get('anxiety') or 5
+                )
+
             # エピソード記憶を抽出（バックグラウンドで実行）
             episode = await episodic_memory_system.extract_episode_from_conversation(
                 user_id=user_id,
@@ -473,6 +481,25 @@ async def chat_with_counselor(chat_message: ChatMessage):
             )
             if episode:
                 print(f"Episode recorded: {episode.title}")
+
+                # 抽出されたエピソード記憶をプロファイルに追加
+                user_profile_system.add_classified_memory(
+                    user_id=user_id,
+                    memory_content=episode.title,
+                    memory_type=episode.emotion,
+                    importance_score=episode.importance_score
+                )
+
+            # 一般的な記憶についても重要度に基づいてプロファイルに追加
+            if user_id in memory_system.memory_items:
+                for memory_item in memory_system.memory_items[user_id][-5:]:
+                    if memory_item.importance_score >= 0.15:
+                        user_profile_system.add_classified_memory(
+                            user_id=user_id,
+                            memory_content=memory_item.content,
+                            memory_type=memory_item.memory_type,
+                            importance_score=memory_item.importance_score
+                        )
 
         except Exception as e:
             print(f"Error recording episodic memory: {e}")
@@ -895,7 +922,9 @@ async def get_user_profile(user_id: str):
     profile = user_profile_system.get_profile(user_id)
 
     if not profile:
-        raise HTTPException(status_code=404, detail="User profile not found")
+        # プロファイルが存在しない場合は新規作成
+        profile = UserProfile(user_id=user_id)
+        user_profile_system.create_or_update_profile(profile)
 
     return {
         "user_id": user_id,
@@ -931,6 +960,53 @@ async def get_user_state(user_id: str):
     return {
         "user_id": user_id,
         "state": user_states[user_id]
+    }
+
+@app.post("/api/profile/{user_id}/update-state")
+async def update_user_state(user_id: str, mood: int = 5, energy: int = 5, anxiety: int = 5):
+    """ユーザーの状態を更新"""
+    user_profile_system.update_user_state(user_id, mood, energy, anxiety)
+
+    return {
+        "user_id": user_id,
+        "updated": True,
+        "state": {
+            "mood": mood,
+            "energy": energy,
+            "anxiety": anxiety
+        }
+    }
+
+@app.post("/api/profile/{user_id}/add-memory")
+async def add_memory_to_profile(
+    user_id: str,
+    content: str,
+    memory_type: str,
+    importance: float = 0.5
+):
+    """プロファイルに分類されたメモリを追加"""
+    user_profile_system.add_classified_memory(
+        user_id=user_id,
+        memory_content=content,
+        memory_type=memory_type,
+        importance_score=importance
+    )
+
+    return {
+        "user_id": user_id,
+        "added": True,
+        "memory_type": memory_type,
+        "importance": importance
+    }
+
+@app.get("/api/profile/{user_id}/external-memory")
+async def get_external_memory(user_id: str):
+    """AIの外部記憶として使用する記憶情報を取得"""
+    external_memory = user_profile_system.get_external_memory(user_id)
+
+    return {
+        "user_id": user_id,
+        "external_memory": external_memory
     }
 
 @app.get("/api/episodes/{user_id}")
