@@ -39,18 +39,6 @@ class UserProfile:
     daily_routine: Optional[str] = None  # 日常の過ごし方
     emotional_state: Optional[str] = None  # 現在の気持ち・感情状態
 
-    # 状態情報（最新・リアルタイム）
-    current_mood: int = 5  # 0-10, 現在の気分
-    current_energy: int = 5  # 0-10, 現在のエネルギー
-    current_anxiety: int = 5  # 0-10, 現在の不安度
-    last_session_date: Optional[str] = None  # 最後のセッション日時
-    session_count: int = 0  # セッション総数
-
-    # 分類された記憶情報
-    critical_memories: List[Dict[str, Any]] = field(default_factory=list)  # 重要度0.8以上
-    important_memories: List[Dict[str, Any]] = field(default_factory=list)  # 重要度0.5-0.8
-    regular_memories: List[Dict[str, Any]] = field(default_factory=list)  # 重要度0.15-0.5
-
     # メタデータ
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -101,14 +89,6 @@ class UserProfileSystem:
                 work_status TEXT,
                 daily_routine TEXT,
                 emotional_state TEXT,
-                current_mood INTEGER DEFAULT 5,
-                current_energy INTEGER DEFAULT 5,
-                current_anxiety INTEGER DEFAULT 5,
-                last_session_date TEXT,
-                session_count INTEGER DEFAULT 0,
-                critical_memories TEXT,
-                important_memories TEXT,
-                regular_memories TEXT,
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
@@ -138,10 +118,6 @@ class UserProfileSystem:
         hobbies_str = row[3]
         hobbies = json.loads(hobbies_str) if hobbies_str else []
 
-        critical_memories = json.loads(row[24]) if row[24] else []
-        important_memories = json.loads(row[25]) if row[25] else []
-        regular_memories = json.loads(row[26]) if row[26] else []
-
         return UserProfile(
             user_id=row[0],
             name=row[1],
@@ -162,16 +138,8 @@ class UserProfileSystem:
             work_status=row[16],
             daily_routine=row[17],
             emotional_state=row[18],
-            current_mood=row[19] or 5,
-            current_energy=row[20] or 5,
-            current_anxiety=row[21] or 5,
-            last_session_date=row[22],
-            session_count=row[23] or 0,
-            critical_memories=critical_memories,
-            important_memories=important_memories,
-            regular_memories=regular_memories,
-            created_at=row[27],
-            updated_at=row[28]
+            created_at=row[19],
+            updated_at=row[20]
         )
 
     def create_or_update_profile(self, profile: UserProfile) -> bool:
@@ -184,9 +152,6 @@ class UserProfileSystem:
         profile.updated_at = datetime.now().isoformat()
 
         hobbies_json = json.dumps(profile.hobbies, ensure_ascii=False)
-        critical_memories_json = json.dumps(profile.critical_memories, ensure_ascii=False)
-        important_memories_json = json.dumps(profile.important_memories, ensure_ascii=False)
-        regular_memories_json = json.dumps(profile.regular_memories, ensure_ascii=False)
 
         cursor.execute('''
             INSERT OR REPLACE INTO user_profiles (
@@ -194,11 +159,8 @@ class UserProfileSystem:
                 concerns, goals, personality, experiences, symptoms,
                 triggers, coping_methods, support_system, medication,
                 work_status, daily_routine, emotional_state,
-                current_mood, current_energy, current_anxiety,
-                last_session_date, session_count,
-                critical_memories, important_memories, regular_memories,
                 created_at, updated_at
-            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
         ''', (
             profile.user_id, profile.name, profile.job, hobbies_json,
             profile.age, profile.location, profile.family,
@@ -206,9 +168,6 @@ class UserProfileSystem:
             profile.experiences, profile.symptoms, profile.triggers,
             profile.coping_methods, profile.support_system, profile.medication,
             profile.work_status, profile.daily_routine, profile.emotional_state,
-            profile.current_mood, profile.current_energy, profile.current_anxiety,
-            profile.last_session_date, profile.session_count,
-            critical_memories_json, important_memories_json, regular_memories_json,
             profile.created_at, profile.updated_at
         ))
 
@@ -371,84 +330,6 @@ class UserProfileSystem:
             summary_parts.append(f"勤務状況: {profile.work_status[:100]}...")
 
         return "\n".join(summary_parts) if summary_parts else "プロファイル情報がありません。"
-
-    def add_classified_memory(self, user_id: str, memory_content: str,
-                            memory_type: str, importance_score: float) -> bool:
-        """
-        重要度に基づいて記憶をプロファイルに分類して追加
-        importance_score: 0.0-1.0
-        """
-        profile = self.get_profile(user_id)
-        if not profile:
-            profile = UserProfile(user_id=user_id)
-
-        memory_item = {
-            "content": memory_content,
-            "type": memory_type,
-            "importance": importance_score,
-            "added_at": datetime.now().isoformat()
-        }
-
-        # 重要度に基づいて分類
-        if importance_score >= 0.8:
-            # 重要度の高い順にソート（新しいものが前）
-            profile.critical_memories.insert(0, memory_item)
-            # 古い記憶は削除（最大50件保持）
-            if len(profile.critical_memories) > 50:
-                profile.critical_memories = profile.critical_memories[:50]
-        elif importance_score >= 0.5:
-            profile.important_memories.insert(0, memory_item)
-            if len(profile.important_memories) > 100:
-                profile.important_memories = profile.important_memories[:100]
-        else:
-            profile.regular_memories.insert(0, memory_item)
-            if len(profile.regular_memories) > 200:
-                profile.regular_memories = profile.regular_memories[:200]
-
-        return self.create_or_update_profile(profile)
-
-    def update_user_state(self, user_id: str, mood: int, energy: int,
-                         anxiety: int) -> bool:
-        """ユーザーの現在の状態を更新"""
-        profile = self.get_profile(user_id)
-        if not profile:
-            profile = UserProfile(user_id=user_id)
-
-        profile.current_mood = max(0, min(10, mood))
-        profile.current_energy = max(0, min(10, energy))
-        profile.current_anxiety = max(0, min(10, anxiety))
-        profile.last_session_date = datetime.now().isoformat()
-        profile.session_count += 1
-
-        return self.create_or_update_profile(profile)
-
-    def get_external_memory(self, user_id: str, max_critical: int = 5,
-                           max_important: int = 10) -> Dict[str, Any]:
-        """
-        AIの外部記憶として使用する記憶情報を取得
-        重要な記憶の上位Nを優先的に提供
-        """
-        profile = self.get_profile(user_id)
-        if not profile:
-            return {"critical": [], "important": [], "total_memories": 0}
-
-        return {
-            "critical": profile.critical_memories[:max_critical],
-            "important": profile.important_memories[:max_important],
-            "current_state": {
-                "mood": profile.current_mood,
-                "energy": profile.current_energy,
-                "anxiety": profile.current_anxiety,
-                "last_session": profile.last_session_date
-            },
-            "profile_summary": {
-                "concerns": profile.concerns,
-                "goals": profile.goals,
-                "symptoms": profile.symptoms,
-                "coping_methods": profile.coping_methods
-            },
-            "total_memories": len(profile.critical_memories) + len(profile.important_memories) + len(profile.regular_memories)
-        }
 
     def delete_profile(self, user_id: str) -> bool:
         """プロファイルを削除"""
