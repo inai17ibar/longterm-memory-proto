@@ -1,8 +1,5 @@
 import React, { useState, useEffect } from 'react';
 import { MemoryDisplay } from './MemoryDisplay';
-import { ProfileDebug } from './ProfileDebug';
-import { EmotionHistory } from './EmotionHistory';
-import { MemoryInsights } from './MemoryInsights';
 
 function App() {
   const [currentMessage, setCurrentMessage] = useState('');
@@ -435,7 +432,7 @@ function App() {
             </div>
           </div>
 
-          {/* 記憶された情報カード（LangChainベース） */}
+          {/* ユーザDBカード */}
           <div style={{
             background: 'white',
             borderRadius: '16px',
@@ -444,7 +441,7 @@ function App() {
             padding: '24px'
           }}>
             <h2 style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '16px' }}>
-              🧠 記憶された情報（重要度順）
+              📊 ユーザDB
             </h2>
             {langchainMemories.length > 0 ? (
               <MemoryDisplay memories={langchainMemories} userInfo={userInfo} />
@@ -753,15 +750,6 @@ function App() {
               </p>
             )}
           </div>
-
-          {/* プロファイル・デバッグ情報 */}
-          <ProfileDebug userId={userId} apiUrl={API_URL} />
-
-          {/* 感情履歴・エピソード記憶 */}
-          <EmotionHistory userId={userId} apiUrl={API_URL} />
-
-          {/* 記憶の統合・関連性 */}
-          <MemoryInsights userId={userId} apiUrl={API_URL} />
 
           {/* 設定カード */}
           <div style={{

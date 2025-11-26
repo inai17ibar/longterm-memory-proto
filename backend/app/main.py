@@ -111,26 +111,32 @@ def analyze_response_pattern(user_message: str, conversation_history: List[Dict]
     if any(keyword in message for keyword in solution_keywords + problem_keywords):
         return 3
 
-    # 短い肯定的な返答（「はい」「うん」など）の判定
-    affirmative_responses = ['はい', 'うん', 'そう', 'いいです', 'お願い', 'そうですね', 'ええ']
+    # パターン1: 短い返事や話の途中（相槌のみ）
+    # 非常に短い返答は基本的にパターン1（相槌）として扱う
+    short_responses = ['はい', 'うん', 'そう', 'いいえ', 'ええ', 'うーん', 'あー', 'えー', 'まあ', 'ん', 'ふむ', 'へえ', 'ほう']
+
+    # 5文字以下の短い返答、または「...」で終わる場合はパターン1
+    if len(message) <= 5:
+        # 短い返答リストに完全一致する場合
+        if any(resp == message for resp in short_responses):
+            return 1
+        # 3文字以下の超短文の場合も相槌とみなす
+        if len(message) <= 3:
+            return 1
+
+    # 「...」で終わる場合も相槌（話の途中）
+    if message.endswith('...'):
+        return 1
+
+    # 短い肯定的な返答でAIが提案していた場合のみパターン2
+    affirmative_responses = ['はい', 'うん', 'そう', 'いいです', 'お願い', 'そうですね', 'ええ', 'お願いします']
     is_affirmative = any(resp in message for resp in affirmative_responses)
 
-    # AIが提案や具体的な質問をした直後の「はい」は、パターン2（具体的な展開）にする
-    if is_affirmative and len(message) <= 10:
-        # AIが「〜しませんか？」「〜考えてみませんか？」などの提案をしていた場合
+    if is_affirmative and len(message) > 5 and len(message) <= 15:
+        # AIが提案していた場合のみパターン2に
         proposal_keywords = ['ませんか', '考えて', '試して', '工夫', '一緒に', 'できそう', '方法']
         if any(keyword in last_ai_response for keyword in proposal_keywords):
-            return 2  # 具体的な展開を期待
-
-    # パターン1: 短い返事や話の途中（相槌のみ）
-    # より厳密に：単なる相槌や「...」で終わる場合のみ
-    minimal_responses = ['うーん', 'あー', 'えー', 'まあ', 'ん']
-    if (len(message) <= 5 and any(resp == message for resp in minimal_responses)) or message.endswith('...'):
-        return 1
-
-    # 前回質問していて、ごく短い回答（3文字以下）の場合のみパターン1
-    if ('？' in last_ai_response or '?' in last_ai_response) and len(message) <= 3:
-        return 1
+            return 2
 
     # デフォルトはパターン2（傾聴）
     return 2
