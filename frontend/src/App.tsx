@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { MemoryDisplay } from './MemoryDisplay';
+import { ExtendedProfileManager } from './ExtendedProfileManager';
 
 function App() {
   const [currentMessage, setCurrentMessage] = useState('');
@@ -431,6 +432,9 @@ function App() {
               </button>
             </div>
           </div>
+
+          {/* 拡張プロファイル管理カード */}
+          <ExtendedProfileManager userId={userId} apiUrl={API_URL} />
 
           {/* ユーザDBカード */}
           <div style={{

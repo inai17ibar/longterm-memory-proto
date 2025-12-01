@@ -173,7 +173,9 @@ class ExtendedUserProfile:
             # extra フィールドに未定義のキーを格納
             known_keys = {'comedian', 'favorite_food', 'favorite_animal', 'tv_drama',
                          'comedians', 'food', 'beverage', 'drink'}
-            extra = {k: v for k, v in fav_data.items() if k not in known_keys}
+            # 既存のextraキーを除外して、新しいextraを作成（無限ネストを防ぐ）
+            # known_keysにもextraにも含まれないキーのみを抽出
+            extra = {k: v for k, v in fav_data.items() if k not in known_keys and k != 'extra'}
             fav_data['extra'] = extra
             # 既知のキーのみで Favorites を作成
             filtered_fav = {k: v for k, v in fav_data.items() if k in known_keys or k == 'extra'}
@@ -277,6 +279,74 @@ class ExtendedProfileSystem:
             return True
         return False
 
+    def sync_from_user_profile(self, user_id: str, user_profile: Any) -> ExtendedUserProfile:
+        """
+        旧来のUserProfileから拡張プロファイルにデータを同期
+        user_profileの情報を拡張プロファイルに反映させる
+        """
+        # 既存の拡張プロファイルを取得、なければ新規作成
+        profile = self.get_profile(user_id)
+        if not profile:
+            profile = ExtendedUserProfile(user_id=user_id)
+
+        # GeneralProfileのマッピング
+        if hasattr(user_profile, 'name') and user_profile.name:
+            profile.profile_settings.display_name = user_profile.name
+        if hasattr(user_profile, 'job') and user_profile.job:
+            profile.general_profile.occupation = user_profile.job
+        if hasattr(user_profile, 'location') and user_profile.location:
+            profile.general_profile.location = user_profile.location
+        if hasattr(user_profile, 'age') and user_profile.age:
+            profile.general_profile.age = user_profile.age
+        if hasattr(user_profile, 'family') and user_profile.family:
+            profile.general_profile.family = user_profile.family
+        if hasattr(user_profile, 'hobbies') and user_profile.hobbies:
+            profile.general_profile.hobbies = user_profile.hobbies
+
+        # MentalProfileのマッピング
+        if hasattr(user_profile, 'emotional_state') and user_profile.emotional_state:
+            profile.mental_profile.current_mental_state = user_profile.emotional_state
+        if hasattr(user_profile, 'medication') and user_profile.medication:
+            profile.mental_profile.recent_medication_change = user_profile.medication
+        if hasattr(user_profile, 'symptoms') and user_profile.symptoms:
+            profile.mental_profile.symptoms = user_profile.symptoms
+        if hasattr(user_profile, 'triggers') and user_profile.triggers:
+            profile.mental_profile.triggers = user_profile.triggers
+        if hasattr(user_profile, 'coping_methods') and user_profile.coping_methods:
+            profile.mental_profile.coping_methods = user_profile.coping_methods
+        if hasattr(user_profile, 'support_system') and user_profile.support_system:
+            profile.mental_profile.support_system = user_profile.support_system
+
+        # Concerns（悩み）を recent_concerns に追加
+        if hasattr(user_profile, 'concerns') and user_profile.concerns:
+            if "その他" not in profile.recent_concerns:
+                profile.recent_concerns["その他"] = []
+            # 既存の悩みと重複しないようにチェック
+            existing_summaries = {c.summary for cat in profile.recent_concerns.values() for c in cat}
+            if user_profile.concerns not in existing_summaries:
+                new_concern = Concern(
+                    summary=user_profile.concerns[:50] if len(user_profile.concerns) > 50 else user_profile.concerns,
+                    details=user_profile.concerns,
+                    category="その他",
+                    status="継続中"
+                )
+                profile.recent_concerns["その他"].append(new_concern)
+
+        # Goals（目標）を goals に追加
+        if hasattr(user_profile, 'goals') and user_profile.goals:
+            # 既存の目標と重複しないようにチェック
+            existing_goals = {g.goal for g in profile.goals}
+            if user_profile.goals not in existing_goals:
+                new_goal = Goal(
+                    goal=user_profile.goals,
+                    importance="medium",
+                    status="active"
+                )
+                profile.goals.append(new_goal)
+
+        self.create_or_update_profile(profile)
+        return profile
+
     def generate_profile_summary(self, user_id: str) -> str:
         """プロファイル要約を生成（プロンプト用）"""
         profile = self.get_profile(user_id)
@@ -295,23 +365,36 @@ class ExtendedProfileSystem:
 
         # 一般プロファイル
         general = profile.general_profile
-        if general.occupation or general.location or general.hobbies:
+        if general.occupation or general.location or general.hobbies or general.age or general.family:
             summary_parts.append(f"\n## 基本情報")
+            if general.age:
+                summary_parts.append(f"- 年齢: {general.age}")
             if general.occupation:
                 summary_parts.append(f"- 職業: {general.occupation}")
             if general.location:
                 summary_parts.append(f"- 住所: {general.location}")
+            if general.family:
+                summary_parts.append(f"- 家族: {general.family}")
             if general.hobbies:
                 summary_parts.append(f"- 趣味: {', '.join(general.hobbies)}")
 
         # メンタルプロファイル
         mental = profile.mental_profile
-        if mental.current_mental_state or mental.recent_medication_change:
+        if (mental.current_mental_state or mental.recent_medication_change or
+            mental.symptoms or mental.triggers or mental.coping_methods or mental.support_system):
             summary_parts.append(f"\n## メンタルヘルス状況")
             if mental.current_mental_state:
                 summary_parts.append(f"- 現在の状態: {mental.current_mental_state}")
             if mental.recent_medication_change:
-                summary_parts.append(f"- 最近の変化: {mental.recent_medication_change}")
+                summary_parts.append(f"- 服薬・通院: {mental.recent_medication_change}")
+            if mental.symptoms:
+                summary_parts.append(f"- 症状: {mental.symptoms}")
+            if mental.triggers:
+                summary_parts.append(f"- ストレス要因: {mental.triggers}")
+            if mental.coping_methods:
+                summary_parts.append(f"- 対処法: {mental.coping_methods}")
+            if mental.support_system:
+                summary_parts.append(f"- サポート体制: {mental.support_system}")
 
         # お気に入り
         fav = profile.favorites

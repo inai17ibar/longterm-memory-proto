@@ -143,12 +143,33 @@ def analyze_response_pattern(user_message: str, conversation_history: List[Dict]
     # デフォルトはパターン2（傾聴）
     return 2
 
-def generate_system_prompt(user_context: str, conversation_context: str, response_pattern: int) -> str:
+def generate_system_prompt(user_context: str, conversation_context: str, response_pattern: int, extended_profile=None) -> str:
     """回答パターンに応じたシステムプロンプトを生成"""
 
-    base_prompt = f"""あなたは「メンタルバリアフリー」というビジョンを持つAIメンタルカウンセラーです。
+    # 拡張プロファイルから設定を取得
+    ai_name = "カウンセラー"
+    ai_personality = "優しく寄り添うガイド"
+    response_length_style = "medium"
+
+    if extended_profile:
+        settings = extended_profile.profile_settings
+        ai_name = settings.ai_name
+        ai_personality = settings.ai_personality
+        response_length_style = settings.response_length_style
+
+    # 応答スタイルに応じた文字数制限
+    length_limits = {
+        "short": {"pattern1": 15, "pattern2": 80, "pattern3": 150},
+        "medium": {"pattern1": 15, "pattern2": 100, "pattern3": 200},
+        "long": {"pattern1": 15, "pattern2": 150, "pattern3": 300}
+    }
+    limits = length_limits.get(response_length_style, length_limits["medium"])
+
+    base_prompt = f"""あなたは{ai_name}という名前のAIメンタルカウンセラーです。
+あなたの性格・役割は「{ai_personality}」です。
 
 ## あなたのビジョンと基本スタンス
+「メンタルバリアフリー」というビジョンを持っています。
 - 不安や悩みを抱える人の感情も、それが個性であると捉えてください
 - 無理に更生させようとせず、あなた自身がユーザーに合わせて変わってください
 - ユーザーにとって「ここでは自分らしくいられる」「居心地が良い」場所を提供してください
@@ -177,17 +198,17 @@ modesに含まれるものを優先して使ってください：
 {conversation_context}"""
 
     if response_pattern == 1:
-        return base_prompt + """
+        return base_prompt + f"""
 
 ## 回答方針（パターン1: 応答のみ）
 - ユーザーの話が途中で途切れており、続きがありそうな状況です
 - 「はい」「なるほど」「そうなんですね」「うんうん」「うん」など適切な相槌だけしてください
 - 特に質問をする必要はありません
-- 15文字以下で回答してください
+- {limits['pattern1']}文字以下で回答してください
 - ユーザーが話を続けやすい雰囲気を作ってください"""
 
     elif response_pattern == 2:
-        return base_prompt + """
+        return base_prompt + f"""
 
 ## 回答方針（パターン2: 傾聴）
 - 傾聴型で、ユーザーが気軽に話せるように質問してください
@@ -195,10 +216,10 @@ modesに含まれるものを優先して使ってください：
 - 評価しない・急がない：「〜すべき」「〜が悪い」は避け、ただ話を「受け止める」
 - 安心・安全の場づくり：「ここでは〜しても大丈夫」「一人じゃないです」
 - ポジティブもネガティブも尊重：「その報告うれしいです」「苦しい中でよく話してくれました」
-- 100文字以下で回答してください"""
+- {limits['pattern2']}文字以下で回答してください"""
 
     else:  # pattern 3
-        return base_prompt + """
+        return base_prompt + f"""
 
 ## 回答方針（パターン3: 解決策提案・客観的視点）
 - ユーザーが悩んで周りが見えなくなっている状況かもしれません
@@ -206,7 +227,7 @@ modesに含まれるものを優先して使ってください：
 - 客観的に、ユーザーの良さを見つけて褒めてください
 - 解決を急がず、ユーザーが安心して話せる感覚を持たせてください
 - 解決策の押し付けはせず、どんなことができそうか一緒に考える姿勢を持ってください
-- 200文字以下で回答してください"""
+- {limits['pattern3']}文字以下で回答してください"""
 
 @app.get("/healthz")
 async def healthz():
@@ -288,52 +309,25 @@ async def chat_with_counselor(chat_message: ChatMessage):
     # ★ RAG: 知識ベースから関連知識を検索
     relevant_knowledge = knowledge_base.search_knowledge(message, limit=3)
 
-    # ★ ユーザープロファイルを取得
+    # ★ ユーザープロファイルを取得して拡張プロファイルに統合
     user_profile = user_profile_system.get_profile(user_id)
+
+    # 旧来のプロファイルがある場合は拡張プロファイルに同期
+    if user_profile:
+        extended_profile_system.sync_from_user_profile(user_id, user_profile)
+
+    # 拡張プロファイルを取得（同期後なので必ず存在する）
+    extended_profile = extended_profile_system.get_profile(user_id)
+
+    # プロファイルがまだない場合は新規作成
+    if not extended_profile:
+        extended_profile = ExtendedUserProfile(user_id=user_id)
+        extended_profile_system.create_or_update_profile(extended_profile)
 
     user_context = ""
 
-    # ★ プロファイル情報の構築
-    profile_summary = ""
-    if user_profile:
-        profile_parts = []
-        if user_profile.name:
-            profile_parts.append(f"名前: {user_profile.name}")
-        if user_profile.age:
-            profile_parts.append(f"年齢: {user_profile.age}")
-        if user_profile.job:
-            profile_parts.append(f"職業: {user_profile.job}")
-        if user_profile.hobbies:
-            profile_parts.append(f"趣味: {', '.join(user_profile.hobbies)}")
-        if user_profile.location:
-            profile_parts.append(f"住所: {user_profile.location}")
-        if user_profile.family:
-            profile_parts.append(f"家族: {user_profile.family}")
-
-        # メンタルヘルス情報
-        if user_profile.concerns:
-            profile_parts.append(f"現在の悩み: {user_profile.concerns}")
-        if user_profile.goals:
-            profile_parts.append(f"目標: {user_profile.goals}")
-        if user_profile.symptoms:
-            profile_parts.append(f"症状: {user_profile.symptoms}")
-        if user_profile.triggers:
-            profile_parts.append(f"ストレス要因: {user_profile.triggers}")
-        if user_profile.coping_methods:
-            profile_parts.append(f"対処法: {user_profile.coping_methods}")
-        if user_profile.support_system:
-            profile_parts.append(f"サポート体制: {user_profile.support_system}")
-        if user_profile.medication:
-            profile_parts.append(f"服薬・通院: {user_profile.medication}")
-        if user_profile.work_status:
-            profile_parts.append(f"勤務状況: {user_profile.work_status}")
-        if user_profile.daily_routine:
-            profile_parts.append(f"日常生活: {user_profile.daily_routine}")
-        if user_profile.emotional_state:
-            profile_parts.append(f"感情状態: {user_profile.emotional_state}")
-
-        if profile_parts:
-            profile_summary = "\nユーザープロファイル:\n" + "\n".join(f"- {p}" for p in profile_parts)
+    # ★ プロファイル情報の構築（拡張プロファイルを使用）
+    profile_summary = "\n" + extended_profile_system.generate_profile_summary(user_id)
 
     # 従来のメモリシステムも維持（後方互換性）
     memory_summary = ""
@@ -404,14 +398,26 @@ async def chat_with_counselor(chat_message: ChatMessage):
 - プロファイルに記録された症状やストレス要因を踏まえて、個別化された応答を心がけてください
 """
     
+    # 会話履歴にユーザー名とAI名を反映
+    user_display_name = extended_profile.profile_settings.display_name if extended_profile else "ユーザー"
+    ai_name = extended_profile.profile_settings.ai_name if extended_profile else "カウンセラー"
+
     recent_conversations = conversations[user_id][-10:] if conversations[user_id] else []
     conversation_context = ""
     if recent_conversations:
         conversation_context = "\n過去の会話:\n"
         for conv in recent_conversations:
-            conversation_context += f"ユーザー: {conv['user_message']}\nカウンセラー: {conv['ai_response']}\n\n"
-    
-    system_prompt = generate_system_prompt(user_context, conversation_context, response_pattern)
+            conversation_context += f"{user_display_name}: {conv['user_message']}\n{ai_name}: {conv['ai_response']}\n\n"
+
+    system_prompt = generate_system_prompt(user_context, conversation_context, response_pattern, extended_profile)
+
+    # デバッグログ
+    if extended_profile:
+        print(f"[DEBUG] Extended Profile Settings:")
+        print(f"  - AI Name: {extended_profile.profile_settings.ai_name}")
+        print(f"  - AI Personality: {extended_profile.profile_settings.ai_personality}")
+        print(f"  - Display Name: {extended_profile.profile_settings.display_name}")
+        print(f"  - Response Style: {extended_profile.profile_settings.response_length_style}")
 
     try:
         # Mock response for testing when OpenAI API is not available
@@ -451,6 +457,12 @@ async def chat_with_counselor(chat_message: ChatMessage):
             ai_response=ai_response
         )
 
+        # ★ プロファイル更新後に拡張プロファイルに同期
+        if profile_updated:
+            updated_user_profile = user_profile_system.get_profile(user_id)
+            if updated_user_profile:
+                extended_profile_system.sync_from_user_profile(user_id, updated_user_profile)
+
         user_info_updated = user_info_updated or profile_updated
 
         return ChatResponse(
@@ -484,6 +496,12 @@ async def chat_with_counselor(chat_message: ChatMessage):
             user_message=message,
             ai_response=ai_response
         )
+
+        # ★ プロファイル更新後に拡張プロファイルに同期
+        if profile_updated:
+            updated_user_profile = user_profile_system.get_profile(user_id)
+            if updated_user_profile:
+                extended_profile_system.sync_from_user_profile(user_id, updated_user_profile)
 
         user_info_updated = user_info_updated or profile_updated
 
