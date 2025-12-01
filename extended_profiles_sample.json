@@ -1,0 +1,177 @@
+{
+  "users": {
+    "demo-user": {
+      "user_id": "demo-user",
+      "profile_settings": {
+        "display_name": "ji",
+        "ai_name": "jiiii",
+        "ai_personality": "優しく寄り添うガイド",
+        "ai_expectation": "2",
+        "response_length_style": "short",
+        "profile_initialized_at": 1764076016
+      },
+      "general_profile": {
+        "hobbies": [
+          "プログラミング"
+        ],
+        "occupation": "AI開発者",
+        "location": "東京都品川区"
+      },
+      "mental_profile": {
+        "recent_medication_change": "月1の薬に変更",
+        "current_mental_state": "良好"
+      },
+      "favorites": {
+        "comedian": "メンバーのうたねた",
+        "favorite_food": "好きな食べ物はクイズのヒントとして挙げられた",
+        "favorite_animal": "ゴリラ",
+        "tv_drama": "テラスハウス",
+        "テラスハウス": "過去のシリーズ",
+        "comedians": [
+          "メンバー"
+        ],
+        "food": "クイズ",
+        "beverage": "coffee",
+        "drink": "ブラックコーヒー"
+      },
+      "important_memories": [
+        {
+          "text": "先週、自動車事故を起こした。",
+          "importance": "high",
+          "timestamp": 1764133863
+        }
+      ],
+      "recent_concerns": {
+        "仕事": [
+          {
+            "id": "60a4c20b090d4a98b77971defabe1eb0",
+            "summary": "仕事の問題",
+            "details": "仕事がうまくいかないことに対する不安",
+            "category": "仕事",
+            "status": "継続中",
+            "timestamp": 1764076041,
+            "sources": [
+              1764076041
+            ]
+          }
+        ],
+        "不安": [
+          {
+            "id": "a761b997913f431bae05f7012999811d",
+            "summary": "自動車事故による不安",
+            "details": "事故を起こしたことで、今後の運転に対する不安がある。",
+            "category": "不安",
+            "status": "継続中",
+            "timestamp": 1764133863,
+            "sources": [
+              1764133863
+            ]
+          }
+        ],
+        "運転": [
+          {
+            "id": "1ffda882c4484bde8a82133225eeb50c",
+            "summary": "長距離運転に対する不安",
+            "details": "先日の事故が影響しているかもしれない",
+            "category": "運転",
+            "status": "継続的",
+            "timestamp": 1764134650,
+            "sources": [
+              1764134650
+            ]
+          }
+        ]
+      },
+      "goals": [
+        {
+          "goal": "新規事業を立ち上げたい",
+          "importance": "high",
+          "timestamp": 1764076455
+        },
+        {
+          "goal": "毎週水曜日に服薬を続ける",
+          "importance": "high",
+          "timestamp": 1764134318,
+          "timeline": "ongoing"
+        }
+      },
+      "relationships": {},
+      "environments": {},
+      "mood_trend": [
+        {
+          "mood": "楽しい",
+          "intensity": "中",
+          "timestamp": 1764076430,
+          "session_id": "1764076006-88688"
+        },
+        {
+          "mood": "良好",
+          "intensity": "中",
+          "timestamp": 1764132701,
+          "session_id": "1764132610-85297"
+        },
+        {
+          "mood": "凹んでいる",
+          "intensity": "中",
+          "timestamp": 1764133876,
+          "session_id": "1764133734-88790"
+        },
+        {
+          "mood": "不安",
+          "intensity": "中",
+          "timestamp": 1764134369,
+          "session_id": "1764134348-89569"
+        },
+        {
+          "mood": "不安",
+          "intensity": "中",
+          "timestamp": 1764134650,
+          "session_id": "1764134411-89696"
+        },
+        {
+          "mood": "元気がない",
+          "intensity": "低",
+          "timestamp": 1764135134,
+          "session_id": "1764135093-90046"
+        }
+      ],
+      "user_tendency": {
+        "dominant_mood": "不安",
+        "counts": {
+          "楽しい": 1,
+          "良好": 1,
+          "凹んでいる": 1,
+          "不安": 2,
+          "元気がない": 1
+        },
+        "recent_intensity": "低",
+        "last_observed": 1764135134,
+        "insight": "気分の揺れが見られますが、直近は 元気がない の様子です。",
+        "time_patterns": [
+          {
+            "key": "daytime",
+            "tendency": "negative",
+            "description": "昼は疲れやすい傾向 (2/5)",
+            "stats": {
+              "positive": 0,
+              "negative": 2,
+              "total": 5
+            }
+          }
+        ],
+        "weekday_patterns": [
+          {
+            "key": "水",
+            "tendency": "negative",
+            "description": "水曜日は疲れやすい傾向 (2/5)",
+            "stats": {
+              "positive": 0,
+              "negative": 2,
+              "total": 5
+            }
+          }
+        ]
+      }
+    }
+  }
+}

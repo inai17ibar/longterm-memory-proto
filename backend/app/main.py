@@ -19,6 +19,8 @@ from .memory_system import memory_system, MemoryItem
 from .knowledge_base import knowledge_base, KnowledgeItem
 # ユーザープロファイルシステムをインポート
 from .user_profile import user_profile_system, UserProfile
+# 拡張プロファイルシステムをインポート
+from .extended_profile import extended_profile_system, ExtendedUserProfile
 # 分析・推論層をインポート
 from .analysis_layer import analysis_layer
 
@@ -907,5 +909,93 @@ async def get_user_state(user_id: str):
     return {
         "user_id": user_id,
         "state": user_states[user_id]
+    }
+
+# ============================================
+# 拡張プロファイルAPI (JSON形式)
+# ============================================
+
+@app.get("/api/extended-profile/{user_id}")
+async def get_extended_profile(user_id: str):
+    """拡張プロファイルをJSON形式で取得"""
+    profile = extended_profile_system.get_profile(user_id)
+
+    if not profile:
+        # プロファイルが存在しない場合は新規作成
+        profile = ExtendedUserProfile(user_id=user_id)
+        extended_profile_system.create_or_update_profile(profile)
+
+    return {
+        "user_id": user_id,
+        "profile": profile.to_dict()
+    }
+
+@app.post("/api/extended-profile/{user_id}")
+async def update_extended_profile(user_id: str, profile_data: Dict[str, Any]):
+    """拡張プロファイルをJSON形式で更新"""
+    try:
+        profile = ExtendedUserProfile.from_dict(user_id, profile_data)
+        extended_profile_system.create_or_update_profile(profile)
+
+        return {
+            "user_id": user_id,
+            "updated": True,
+            "profile": profile.to_dict()
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Invalid profile data: {str(e)}")
+
+@app.get("/api/extended-profile/{user_id}/json")
+async def get_extended_profile_json(user_id: str):
+    """拡張プロファイルをJSON文字列で取得（ダウンロード用）"""
+    profile = extended_profile_system.get_profile(user_id)
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="Extended profile not found")
+
+    return {
+        "user_id": user_id,
+        "json": profile.to_json(indent=2)
+    }
+
+@app.post("/api/extended-profile/{user_id}/import")
+async def import_extended_profile(user_id: str, json_data: Dict[str, Any]):
+    """JSON形式でプロファイルをインポート"""
+    try:
+        # "users" キーがある場合は該当ユーザーのデータを抽出
+        if "users" in json_data and user_id in json_data["users"]:
+            profile_data = json_data["users"][user_id]
+        else:
+            profile_data = json_data
+
+        profile = ExtendedUserProfile.from_dict(user_id, profile_data)
+        extended_profile_system.create_or_update_profile(profile)
+
+        return {
+            "user_id": user_id,
+            "imported": True,
+            "message": "Profile imported successfully"
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
+
+@app.delete("/api/extended-profile/{user_id}")
+async def delete_extended_profile(user_id: str):
+    """拡張プロファイルを削除"""
+    deleted = extended_profile_system.delete_profile(user_id)
+
+    if not deleted:
+        raise HTTPException(status_code=404, detail="Extended profile not found")
+
+    return {"message": "Extended profile deleted successfully"}
+
+@app.get("/api/extended-profile/{user_id}/summary")
+async def get_extended_profile_summary(user_id: str):
+    """拡張プロファイルの要約を取得（プロンプト用）"""
+    summary = extended_profile_system.generate_profile_summary(user_id)
+
+    return {
+        "user_id": user_id,
+        "summary": summary
     }
 
