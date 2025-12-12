@@ -183,7 +183,15 @@ class ExtendedUserProfile:
 
         # important_memories
         if "important_memories" in data:
-            profile.important_memories = [ImportantMemory(**m) for m in data["important_memories"]]
+            memories = []
+            for m in data["important_memories"]:
+                if isinstance(m, str):
+                    # 文字列の場合は、textフィールドに設定してImportantMemoryオブジェクトを作成
+                    memories.append(ImportantMemory(text=m))
+                elif isinstance(m, dict):
+                    # 辞書の場合は、そのまま展開
+                    memories.append(ImportantMemory(**m))
+            profile.important_memories = memories
 
         # recent_concerns
         if "recent_concerns" in data:
@@ -194,7 +202,15 @@ class ExtendedUserProfile:
 
         # goals
         if "goals" in data:
-            profile.goals = [Goal(**g) for g in data["goals"]]
+            goals = []
+            for g in data["goals"]:
+                if isinstance(g, str):
+                    # 文字列の場合は、goalフィールドに設定してGoalオブジェクトを作成
+                    goals.append(Goal(goal=g))
+                elif isinstance(g, dict):
+                    # 辞書の場合は、そのまま展開
+                    goals.append(Goal(**g))
+            profile.goals = goals
 
         # relationships, environments
         profile.relationships = data.get("relationships", {})

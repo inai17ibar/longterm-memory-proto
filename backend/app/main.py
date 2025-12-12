@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, UploadFile, File
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -994,6 +994,33 @@ async def import_extended_profile(user_id: str, json_data: Dict[str, Any]):
             "imported": True,
             "message": "Profile imported successfully"
         }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
+
+@app.post("/api/extended-profile/{user_id}/import-file")
+async def import_extended_profile_from_file(user_id: str, file: UploadFile = File(...)):
+    """JSONファイルからプロファイルをインポート"""
+    try:
+        # ファイル内容を読み込み
+        contents = await file.read()
+        json_data = json.loads(contents.decode('utf-8'))
+
+        # "users" キーがある場合は該当ユーザーのデータを抽出
+        if "users" in json_data and user_id in json_data["users"]:
+            profile_data = json_data["users"][user_id]
+        else:
+            profile_data = json_data
+
+        profile = ExtendedUserProfile.from_dict(user_id, profile_data)
+        extended_profile_system.create_or_update_profile(profile)
+
+        return {
+            "user_id": user_id,
+            "imported": True,
+            "message": f"Profile imported successfully from file: {file.filename}"
+        }
+    except json.JSONDecodeError as e:
+        raise HTTPException(status_code=400, detail=f"Invalid JSON file: {str(e)}")
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
 

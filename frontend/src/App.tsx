@@ -33,7 +33,7 @@ function App() {
   }>>([]);
   const [isExporting, setIsExporting] = useState(false);
 
-  const API_URL = 'http://localhost:8001'; // process.env.REACT_APP_API_URL || 'http://localhost:8001';
+  const API_URL = 'http://localhost:8000'; // process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
   useEffect(() => {
     // ユーザーIDを生成または取得
