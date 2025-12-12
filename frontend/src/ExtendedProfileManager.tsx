@@ -64,15 +64,27 @@ export const ExtendedProfileManager: React.FC<ExtendedProfileManagerProps> = ({ 
     }
   };
 
-  const handleExport = () => {
-    const blob = new Blob([jsonInput], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `extended_profile_${userId}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    setMessage('エクスポート完了');
+  const handleExport = async () => {
+    try {
+      setIsLoading(true);
+      const response = await fetch(`${apiUrl}/api/extended-profile/${userId}/json`);
+      const data = await response.json();
+
+      // data.jsonは文字列なので、そのまま使用
+      const blob = new Blob([data.json], { type: 'application/json' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `extended_profile_${userId}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setMessage('エクスポート完了');
+    } catch (error) {
+      console.error('Error exporting profile:', error);
+      setMessage('エクスポートに失敗しました: ' + (error as Error).message);
+    } finally {
+      setIsLoading(false);
+    }
   };
 
   const handleUpdate = async () => {
