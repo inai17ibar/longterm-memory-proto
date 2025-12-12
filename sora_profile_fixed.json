@@ -1,0 +1,72 @@
+{
+  "user_id": "user_001",
+  "profile_settings": {
+    "display_name": "そら",
+    "ai_name": "アイ",
+    "ai_personality": "優しく寄り添うガイド",
+    "ai_expectation": "2",
+    "response_length_style": "short",
+    "profile_initialized_at": 1737331200
+  },
+  "general_profile": {
+    "hobbies": ["音楽鑑賞", "カフェ巡り"],
+    "occupation": null,
+    "location": "東京都内",
+    "age": "32",
+    "family": null
+  },
+  "mental_profile": {
+    "recent_medication_change": null,
+    "current_mental_state": "軽い不安・疲労感・睡眠の浅さ",
+    "symptoms": "寝つきが悪い、頭がずっと回っている感じ、疲れが抜けない",
+    "triggers": "水曜の広報会議後に緊張が残りやすい、急ぎのリライト案件が重なると負荷が上がる",
+    "coping_methods": "短い散歩・照明を落として休む・好きな音楽を流す",
+    "support_system": "同僚の佐藤さん"
+  },
+  "favorites": {
+    "comedian": null,
+    "favorite_food": "和風パスタ",
+    "favorite_animal": "犬",
+    "tv_drama": "日曜夜のヒューマンドラマ",
+    "comedians": [],
+    "food": "パスタ",
+    "beverage": "カフェラテ",
+    "drink": "カフェラテ",
+    "extra": {
+      "relaxing_music": "Lo-fi ピアノ曲"
+    }
+  },
+  "important_memories": [
+    "駅前のMARUカフェに寄ったとき落ち着けた経験"
+  ],
+  "recent_concerns": {},
+  "goals": [
+    "睡眠のリズムを少し整えたい",
+    "不安が強い時でも仕事の調整を自分で言えるようになりたい"
+  ],
+  "relationships": {
+    "coworkers": {
+      "佐藤さん": {
+        "role": "同僚",
+        "context": "リライト案件でよく関わる"
+      }
+    }
+  },
+  "environments": {
+    "favorite_cafe": "駅前のMARUカフェ",
+    "workplace": "広報部オフィス"
+  },
+  "mood_trend": [],
+  "user_tendency": {
+    "dominant_mood": "普通",
+    "counts": {
+      "anxiety": 4,
+      "fatigue": 3
+    },
+    "recent_intensity": "中",
+    "last_observed": 1737331200,
+    "insight": "疲れがたまると不安思考に寄りやすい傾向",
+    "time_patterns": [],
+    "weekday_patterns": []
+  }
+}

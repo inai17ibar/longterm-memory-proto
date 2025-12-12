@@ -53,6 +53,505 @@
         "time_patterns": [],
         "weekday_patterns": []
       }
+    },
+    "user_1732853006088_cqslx1zov": {
+      "user_id": "user_1732853006088_cqslx1zov",
+      "profile_settings": {
+        "display_name": "太郎",
+        "ai_name": "こころちゃん",
+        "ai_personality": "明るく元気な友達のようなサポーター",
+        "ai_expectation": "2",
+        "response_length_style": "short",
+        "profile_initialized_at": 1764557188
+      },
+      "general_profile": {
+        "hobbies": [],
+        "occupation": null,
+        "location": null,
+        "age": null,
+        "family": null
+      },
+      "mental_profile": {
+        "recent_medication_change": null,
+        "current_mental_state": null,
+        "symptoms": null,
+        "triggers": null,
+        "coping_methods": null,
+        "support_system": null
+      },
+      "favorites": {
+        "comedian": null,
+        "favorite_food": null,
+        "favorite_animal": null,
+        "tv_drama": null,
+        "comedians": [],
+        "food": null,
+        "beverage": null,
+        "drink": null,
+        "extra": {}
+      },
+      "important_memories": [],
+      "recent_concerns": {},
+      "goals": [],
+      "relationships": {},
+      "environments": {},
+      "mood_trend": [],
+      "user_tendency": {
+        "dominant_mood": "普通",
+        "counts": {},
+        "recent_intensity": "中",
+        "last_observed": 1764557188,
+        "insight": "",
+        "time_patterns": [],
+        "weekday_patterns": []
+      }
+    },
+    "test_user_001": {
+      "user_id": "test_user_001",
+      "profile_settings": {
+        "display_name": "テスト太郎",
+        "ai_name": "AIカウンセラー",
+        "ai_personality": "優しく寄り添うガイド",
+        "ai_expectation": "2",
+        "response_length_style": "medium",
+        "profile_initialized_at": 1765505080
+      },
+      "general_profile": {
+        "hobbies": [
+          "読書",
+          "散歩"
+        ],
+        "occupation": "エンジニア",
+        "location": null,
+        "age": "30代",
+        "family": null
+      },
+      "mental_profile": {
+        "recent_medication_change": null,
+        "current_mental_state": null,
+        "symptoms": "軽度の不安",
+        "triggers": null,
+        "coping_methods": "深呼吸、散歩",
+        "support_system": null
+      },
+      "favorites": {
+        "comedian": null,
+        "favorite_food": null,
+        "favorite_animal": null,
+        "tv_drama": null,
+        "comedians": [],
+        "food": null,
+        "beverage": null,
+        "drink": null,
+        "extra": {}
+      },
+      "important_memories": [],
+      "recent_concerns": {},
+      "goals": [],
+      "relationships": {},
+      "environments": {},
+      "mood_trend": [],
+      "user_tendency": {
+        "dominant_mood": "普通",
+        "counts": {},
+        "recent_intensity": "中",
+        "last_observed": 1765505080,
+        "insight": "",
+        "time_patterns": [],
+        "weekday_patterns": []
+      }
+    },
+    "test_user_002": {
+      "user_id": "test_user_002",
+      "profile_settings": {
+        "display_name": "インポートユーザー",
+        "ai_name": "インポートAI",
+        "ai_personality": "明るくポジティブなサポーター",
+        "ai_expectation": "2",
+        "response_length_style": "long",
+        "profile_initialized_at": 1765505186
+      },
+      "general_profile": {
+        "hobbies": [
+          "料理",
+          "ヨガ",
+          "映画鑑賞"
+        ],
+        "occupation": "デザイナー",
+        "location": "東京",
+        "age": "20代",
+        "family": null
+      },
+      "mental_profile": {
+        "recent_medication_change": null,
+        "current_mental_state": null,
+        "symptoms": "軽度のストレス",
+        "triggers": "仕事の締め切り",
+        "coping_methods": "ヨガ、音楽鑑賞",
+        "support_system": "友人、家族"
+      },
+      "favorites": {
+        "comedian": null,
+        "favorite_food": null,
+        "favorite_animal": null,
+        "tv_drama": null,
+        "comedians": [],
+        "food": "パスタ",
+        "beverage": "コーヒー",
+        "drink": null,
+        "extra": {}
+      },
+      "important_memories": [
+        {
+          "text": "2024年に転職を成功させた",
+          "importance": "medium",
+          "timestamp": 1765505186
+        },
+        {
+          "text": "週末はヨガ教室に通っている",
+          "importance": "medium",
+          "timestamp": 1765505186
+        }
+      ],
+      "recent_concerns": {},
+      "goals": [
+        {
+          "goal": "毎日30分の瞑想を習慣化する",
+          "importance": "medium",
+          "timestamp": 1765505186,
+          "timeline": "ongoing",
+          "status": "active"
+        },
+        {
+          "goal": "来年までに新しいスキルを習得する",
+          "importance": "medium",
+          "timestamp": 1765505186,
+          "timeline": "ongoing",
+          "status": "active"
+        }
+      ],
+      "relationships": {},
+      "environments": {},
+      "mood_trend": [],
+      "user_tendency": {
+        "dominant_mood": "普通",
+        "counts": {},
+        "recent_intensity": "中",
+        "last_observed": 1765505186,
+        "insight": "",
+        "time_patterns": [],
+        "weekday_patterns": []
+      }
+    },
+    "test_user_003": {
+      "user_id": "test_user_003",
+      "profile_settings": {
+        "display_name": "インポートユーザー",
+        "ai_name": "インポートAI",
+        "ai_personality": "明るくポジティブなサポーター",
+        "ai_expectation": "2",
+        "response_length_style": "long",
+        "profile_initialized_at": 1765505639
+      },
+      "general_profile": {
+        "hobbies": [
+          "料理",
+          "ヨガ",
+          "映画鑑賞"
+        ],
+        "occupation": "デザイナー",
+        "location": "東京",
+        "age": "20代",
+        "family": null
+      },
+      "mental_profile": {
+        "recent_medication_change": null,
+        "current_mental_state": null,
+        "symptoms": "軽度のストレス",
+        "triggers": "仕事の締め切り",
+        "coping_methods": "ヨガ、音楽鑑賞",
+        "support_system": "友人、家族"
+      },
+      "favorites": {
+        "comedian": null,
+        "favorite_food": null,
+        "favorite_animal": null,
+        "tv_drama": null,
+        "comedians": [],
+        "food": "パスタ",
+        "beverage": "コーヒー",
+        "drink": null,
+        "extra": {}
+      },
+      "important_memories": [
+        {
+          "text": "2024年に転職を成功させた",
+          "importance": "medium",
+          "timestamp": 1765505639
+        },
+        {
+          "text": "週末はヨガ教室に通っている",
+          "importance": "medium",
+          "timestamp": 1765505639
+        }
+      ],
+      "recent_concerns": {},
+      "goals": [
+        {
+          "goal": "毎日30分の瞑想を習慣化する",
+          "importance": "medium",
+          "timestamp": 1765505639,
+          "timeline": "ongoing",
+          "status": "active"
+        },
+        {
+          "goal": "来年までに新しいスキルを習得する",
+          "importance": "medium",
+          "timestamp": 1765505639,
+          "timeline": "ongoing",
+          "status": "active"
+        }
+      ],
+      "relationships": {},
+      "environments": {},
+      "mood_trend": [],
+      "user_tendency": {
+        "dominant_mood": "普通",
+        "counts": {},
+        "recent_intensity": "中",
+        "last_observed": 1765505639,
+        "insight": "",
+        "time_patterns": [],
+        "weekday_patterns": []
+      }
+    },
+    "user_1753947148523_c6zcfh6to": {
+      "user_id": "user_1753947148523_c6zcfh6to",
+      "profile_settings": {
+        "display_name": "そら",
+        "ai_name": "アイ",
+        "ai_personality": "優しく寄り添うガイド",
+        "ai_expectation": "2",
+        "response_length_style": "short",
+        "profile_initialized_at": 1737331200
+      },
+      "general_profile": {
+        "hobbies": [
+          "音楽鑑賞",
+          "カフェ巡り"
+        ],
+        "occupation": null,
+        "location": "東京都内",
+        "age": "32",
+        "family": null
+      },
+      "mental_profile": {
+        "recent_medication_change": null,
+        "current_mental_state": "軽い不安・疲労感・睡眠の浅さ",
+        "symptoms": "寝つきが悪い、頭がずっと回っている感じ、疲れが抜けない",
+        "triggers": "水曜の広報会議後に緊張が残りやすい、急ぎのリライト案件が重なると負荷が上がる",
+        "coping_methods": "気分転換の方法",
+        "support_system": "同僚の佐藤さん"
+      },
+      "favorites": {
+        "comedian": null,
+        "favorite_food": "和風パスタ",
+        "favorite_animal": "犬",
+        "tv_drama": "日曜夜のヒューマンドラマ",
+        "comedians": [],
+        "food": "パスタ",
+        "beverage": "カフェラテ",
+        "drink": "カフェラテ",
+        "extra": {}
+      },
+      "important_memories": [
+        {
+          "text": "駅前のMARUカフェに寄ったとき落ち着けた経験",
+          "importance": "medium",
+          "timestamp": 1765513102
+        }
+      ],
+      "recent_concerns": {},
+      "goals": [
+        {
+          "goal": "睡眠のリズムを少し整えたい",
+          "importance": "medium",
+          "timestamp": 1765513102,
+          "timeline": "ongoing",
+          "status": "active"
+        },
+        {
+          "goal": "不安が強い時でも仕事の調整を自分で言えるようになりたい",
+          "importance": "medium",
+          "timestamp": 1765513102,
+          "timeline": "ongoing",
+          "status": "active"
+        }
+      ],
+      "relationships": {
+        "coworkers": {
+          "佐藤さん": {
+            "role": "同僚",
+            "context": "リライト案件でよく関わる"
+          }
+        }
+      },
+      "environments": {
+        "favorite_cafe": "駅前のMARUカフェ",
+        "workplace": "広報部オフィス"
+      },
+      "mood_trend": [],
+      "user_tendency": {
+        "dominant_mood": "普通",
+        "counts": {
+          "anxiety": 4,
+          "fatigue": 3
+        },
+        "recent_intensity": "中",
+        "last_observed": 1737331200,
+        "insight": "疲れがたまると不安思考に寄りやすい傾向",
+        "time_patterns": [],
+        "weekday_patterns": []
+      }
+    },
+    "user_001": {
+      "user_id": "user_001",
+      "profile_settings": {
+        "display_name": "そら",
+        "ai_name": "アイ",
+        "ai_personality": "優しく寄り添うガイド",
+        "ai_expectation": "2",
+        "response_length_style": "short",
+        "profile_initialized_at": 1737331200
+      },
+      "general_profile": {
+        "hobbies": [
+          "音楽鑑賞",
+          "カフェ巡り"
+        ],
+        "occupation": null,
+        "location": "東京都内",
+        "age": "32",
+        "family": null
+      },
+      "mental_profile": {
+        "recent_medication_change": null,
+        "current_mental_state": "軽い不安・疲労感・睡眠の浅さ",
+        "symptoms": "寝つきが悪い、頭がずっと回っている感じ、疲れが抜けない",
+        "triggers": "水曜の広報会議後に緊張が残りやすい、急ぎのリライト案件が重なると負荷が上がる",
+        "coping_methods": "短い散歩・照明を落として休む・好きな音楽を流す",
+        "support_system": "同僚の佐藤さん"
+      },
+      "favorites": {
+        "comedian": null,
+        "favorite_food": "和風パスタ",
+        "favorite_animal": "犬",
+        "tv_drama": "日曜夜のヒューマンドラマ",
+        "comedians": [],
+        "food": "パスタ",
+        "beverage": "カフェラテ",
+        "drink": "カフェラテ",
+        "extra": {}
+      },
+      "important_memories": [
+        {
+          "text": "駅前のMARUカフェに寄ったとき落ち着けた経験",
+          "importance": "medium",
+          "timestamp": 1737331200
+        }
+      ],
+      "recent_concerns": {
+        "work": [
+          {
+            "id": "concern_work_001",
+            "summary": "リライト案件への不安",
+            "details": "リライト案件が続き、佐藤さんに迷惑をかけていないか不安",
+            "category": "work",
+            "status": "継続中",
+            "timestamp": 1737331200,
+            "sources": []
+          }
+        ],
+        "sleep": [
+          {
+            "id": "concern_sleep_001",
+            "summary": "睡眠の問題",
+            "details": "頭が冴えて寝付けない",
+            "category": "sleep",
+            "status": "継続中",
+            "timestamp": 1737331200,
+            "sources": []
+          }
+        ]
+      },
+      "goals": [
+        {
+          "goal": "睡眠のリズムを少し整えたい",
+          "importance": "high",
+          "timestamp": 1737331200,
+          "timeline": "short-term",
+          "status": "active"
+        },
+        {
+          "goal": "不安が強い時でも仕事の調整を自分で言えるようになりたい",
+          "importance": "medium",
+          "timestamp": 1737331200,
+          "timeline": "ongoing",
+          "status": "active"
+        }
+      ],
+      "relationships": {
+        "coworkers": {
+          "佐藤さん": {
+            "role": "同僚",
+            "context": "リライト案件でよく関わる"
+          }
+        }
+      },
+      "environments": {
+        "favorite_cafe": "駅前のMARUカフェ",
+        "workplace": "広報部オフィス"
+      },
+      "mood_trend": [
+        {
+          "mood": "少し不安",
+          "intensity": "中",
+          "timestamp": 1736294400,
+          "session_id": "session_001"
+        },
+        {
+          "mood": "疲れ",
+          "intensity": "中",
+          "timestamp": 1736899200,
+          "session_id": "session_002"
+        }
+      ],
+      "user_tendency": {
+        "dominant_mood": "普通",
+        "counts": {
+          "anxiety": 4,
+          "fatigue": 3
+        },
+        "recent_intensity": "中",
+        "last_observed": 1737331200,
+        "insight": "疲れがたまると不安思考に寄りやすい傾向",
+        "time_patterns": [
+          {
+            "key": "night_anxiety",
+            "tendency": "negative",
+            "description": "夜に不安が強くなる",
+            "stats": {}
+          }
+        ],
+        "weekday_patterns": [
+          {
+            "key": "wednesday_meeting",
+            "tendency": "negative",
+            "description": "水曜の会議後に緊張が残る",
+            "stats": {}
+          }
+        ]
+      }
     }
   }
 }
