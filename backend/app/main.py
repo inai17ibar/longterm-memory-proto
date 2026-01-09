@@ -1,4 +1,4 @@
-from fastapi import FastAPI, HTTPException, UploadFile, File
+from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from typing import List, Optional, Dict, Any
@@ -150,12 +150,25 @@ def generate_system_prompt(user_context: str, conversation_context: str, respons
     ai_name = "カウンセラー"
     ai_personality = "優しく寄り添うガイド"
     response_length_style = "medium"
+    custom_prompt = None
 
     if extended_profile:
         settings = extended_profile.profile_settings
         ai_name = settings.ai_name
         ai_personality = settings.ai_personality
         response_length_style = settings.response_length_style
+        custom_prompt = settings.custom_system_prompt
+
+    # カスタムプロンプトが設定されている場合はそれを使用
+    if custom_prompt:
+        # カスタムプロンプトに変数を置換
+        prompt = custom_prompt
+        prompt = prompt.replace("{user_context}", user_context)
+        prompt = prompt.replace("{conversation_context}", conversation_context)
+        prompt = prompt.replace("{ai_name}", ai_name)
+        prompt = prompt.replace("{ai_personality}", ai_personality)
+        prompt = prompt.replace("{response_pattern}", str(response_pattern))
+        return prompt
 
     # 応答スタイルに応じた文字数制限
     length_limits = {
@@ -963,67 +976,6 @@ async def update_extended_profile(user_id: str, profile_data: Dict[str, Any]):
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Invalid profile data: {str(e)}")
 
-@app.get("/api/extended-profile/{user_id}/json")
-async def get_extended_profile_json(user_id: str):
-    """拡張プロファイルをJSON文字列で取得（ダウンロード用）"""
-    profile = extended_profile_system.get_profile(user_id)
-
-    if not profile:
-        raise HTTPException(status_code=404, detail="Extended profile not found")
-
-    return {
-        "user_id": user_id,
-        "json": profile.to_json(indent=2)
-    }
-
-@app.post("/api/extended-profile/{user_id}/import")
-async def import_extended_profile(user_id: str, json_data: Dict[str, Any]):
-    """JSON形式でプロファイルをインポート"""
-    try:
-        # "users" キーがある場合は該当ユーザーのデータを抽出
-        if "users" in json_data and user_id in json_data["users"]:
-            profile_data = json_data["users"][user_id]
-        else:
-            profile_data = json_data
-
-        profile = ExtendedUserProfile.from_dict(user_id, profile_data)
-        extended_profile_system.create_or_update_profile(profile)
-
-        return {
-            "user_id": user_id,
-            "imported": True,
-            "message": "Profile imported successfully"
-        }
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
-
-@app.post("/api/extended-profile/{user_id}/import-file")
-async def import_extended_profile_from_file(user_id: str, file: UploadFile = File(...)):
-    """JSONファイルからプロファイルをインポート"""
-    try:
-        # ファイル内容を読み込み
-        contents = await file.read()
-        json_data = json.loads(contents.decode('utf-8'))
-
-        # "users" キーがある場合は該当ユーザーのデータを抽出
-        if "users" in json_data and user_id in json_data["users"]:
-            profile_data = json_data["users"][user_id]
-        else:
-            profile_data = json_data
-
-        profile = ExtendedUserProfile.from_dict(user_id, profile_data)
-        extended_profile_system.create_or_update_profile(profile)
-
-        return {
-            "user_id": user_id,
-            "imported": True,
-            "message": f"Profile imported successfully from file: {file.filename}"
-        }
-    except json.JSONDecodeError as e:
-        raise HTTPException(status_code=400, detail=f"Invalid JSON file: {str(e)}")
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=f"Import failed: {str(e)}")
-
 @app.delete("/api/extended-profile/{user_id}")
 async def delete_extended_profile(user_id: str):
     """拡張プロファイルを削除"""
@@ -1042,5 +994,59 @@ async def get_extended_profile_summary(user_id: str):
     return {
         "user_id": user_id,
         "summary": summary
+    }
+
+@app.get("/api/system-prompt/default")
+async def get_default_system_prompt():
+    """デフォルトのシステムプロンプトテンプレートを取得"""
+    # デフォルトのシステムプロンプトを生成（変数プレースホルダー付き）
+    default_prompt = """あなたは{ai_name}という名前のAIメンタルカウンセラーです。
+あなたの性格・役割は「{ai_personality}」です。
+
+## あなたのビジョンと基本スタンス
+「メンタルバリアフリー」というビジョンを持っています。
+- 不安や悩みを抱える人の感情も、それが個性であると捉えてください
+- 無理に更生させようとせず、あなた自身がユーザーに合わせて変わってください
+- ユーザーにとって「ここでは自分らしくいられる」「居心地が良い」場所を提供してください
+
+## 会話モード
+user_context内には「このターンで優先したいモード」が含まれます。
+modesに含まれるものを優先して使ってください：
+
+- empathy: 共感・受容を前面に出し、「わかってもらえた感」を最優先にする
+- emotion_labeling: ユーザーの感情に名前をつけてあげる（不安、悲しみ、怒り、戸惑い など）
+- problem_sorting: 状況を一緒に整理し、「何が起きているか」を一緒に言語化する
+- small_action: 今日〜数日のあいだにできそうな、負担の小さい行動を一緒に考える
+- psychoeducation: 必要に応じて、メンタルヘルスに関する情報や考え方のヒントを優しく共有する
+
+必ずしも全部を使う必要はありません。modesに含まれる2つを中心にしてください。
+
+## 制約条件
+- うつ病で休職中のユーザや復職を目指している方、その他メンタルヘルスに関する方を主な対象とします
+- 医療行為や診断は行わず、緊急事態では専門家への相談を促します
+- 対面での会話のように自然で人間らしいバリエーションに富んだ会話を目指します
+- 記憶しているユーザの情報を会話の中で自然に活用してください
+- 適度に改行を入れて読みやすくしてください
+
+{user_context}
+
+{conversation_context}
+
+## 回答方針
+response_pattern={response_pattern}に応じて以下のように応答してください：
+- pattern=1: 「はい」「なるほど」など短い相槌のみ（15文字以内）
+- pattern=2: 傾聴型で共感を示す応答（100文字程度）
+- pattern=3: 解決策提案・客観的視点を含む応答（200文字程度）"""
+
+    return {
+        "default_prompt": default_prompt,
+        "variables": [
+            "{ai_name}",
+            "{ai_personality}",
+            "{user_context}",
+            "{conversation_context}",
+            "{response_pattern}"
+        ],
+        "description": "システムプロンプトテンプレート。変数は実行時に自動置換されます。"
     }
 

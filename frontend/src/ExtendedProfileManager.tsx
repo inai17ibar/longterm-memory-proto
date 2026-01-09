@@ -40,53 +40,6 @@ export const ExtendedProfileManager: React.FC<ExtendedProfileManagerProps> = ({ 
     }
   };
 
-  const handleImport = async () => {
-    try {
-      setIsLoading(true);
-      const jsonData = JSON.parse(jsonInput);
-      const response = await fetch(`${apiUrl}/api/extended-profile/${userId}/import`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(jsonData),
-      });
-      const data = await response.json();
-      if (data.imported) {
-        setMessage('インポート成功');
-        await loadProfile();
-      }
-    } catch (error) {
-      console.error('Error importing profile:', error);
-      setMessage('インポートに失敗しました: ' + (error as Error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleExport = async () => {
-    try {
-      setIsLoading(true);
-      const response = await fetch(`${apiUrl}/api/extended-profile/${userId}/json`);
-      const data = await response.json();
-
-      // data.jsonは文字列なので、そのまま使用
-      const blob = new Blob([data.json], { type: 'application/json' });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = `extended_profile_${userId}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setMessage('エクスポート完了');
-    } catch (error) {
-      console.error('Error exporting profile:', error);
-      setMessage('エクスポートに失敗しました: ' + (error as Error).message);
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
   const handleUpdate = async () => {
     try {
       setIsLoading(true);
@@ -162,36 +115,6 @@ export const ExtendedProfileManager: React.FC<ExtendedProfileManagerProps> = ({ 
             }}
           >
             プロファイル更新
-          </button>
-          <button
-            onClick={handleImport}
-            disabled={isLoading}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#f59e0b',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            JSONインポート
-          </button>
-          <button
-            onClick={handleExport}
-            disabled={isLoading}
-            style={{
-              padding: '8px 16px',
-              backgroundColor: '#8b5cf6',
-              color: 'white',
-              border: 'none',
-              borderRadius: '4px',
-              cursor: 'pointer',
-              fontSize: '14px'
-            }}
-          >
-            JSONエクスポート
           </button>
           <button
             onClick={loadSummary}

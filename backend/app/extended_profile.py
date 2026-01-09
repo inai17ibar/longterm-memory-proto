@@ -20,6 +20,8 @@ class ProfileSettings:
     ai_expectation: str = "2"  # 1-3の期待レベル
     response_length_style: str = "medium"  # short/medium/long
     profile_initialized_at: int = field(default_factory=lambda: int(datetime.now().timestamp()))
+    # カスタムシステムプロンプト
+    custom_system_prompt: Optional[str] = None  # Noneの場合はデフォルトプロンプトを使用
 
 
 @dataclass

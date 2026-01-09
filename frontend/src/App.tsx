@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { MemoryDisplay } from './MemoryDisplay';
 import { ExtendedProfileManager } from './ExtendedProfileManager';
+import { SystemPromptEditor } from './SystemPromptEditor';
 
 function App() {
   const [currentMessage, setCurrentMessage] = useState('');
@@ -432,6 +433,9 @@ function App() {
               </button>
             </div>
           </div>
+
+          {/* システムプロンプト編集カード */}
+          <SystemPromptEditor userId={userId} apiUrl={API_URL} />
 
           {/* 拡張プロファイル管理カード */}
           <ExtendedProfileManager userId={userId} apiUrl={API_URL} />
