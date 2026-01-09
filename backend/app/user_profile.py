@@ -10,6 +10,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional, List
 from dataclasses import dataclass, asdict, field
 import openai
+from app.config import USER_PROFILES_DB_PATH
 
 
 @dataclass
@@ -55,8 +56,8 @@ class UserProfile:
 class UserProfileSystem:
     """ユーザープロファイル管理システム"""
 
-    def __init__(self, db_path: str = "./user_profiles.db", openai_api_key: Optional[str] = None):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None, openai_api_key: Optional[str] = None):
+        self.db_path = str(db_path or USER_PROFILES_DB_PATH)
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.client = openai.OpenAI(api_key=self.openai_api_key) if self.openai_api_key else None
 

@@ -10,6 +10,7 @@ from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional, Tuple
 from dataclasses import dataclass, asdict
 import numpy as np
+from app.config import MEMORIES_DB_PATH
 
 try:
     # LangChain imports (graceful fallback if not installed)
@@ -199,13 +200,13 @@ class MemoryImportanceCalculator:
 class LangChainMemorySystem:
     """LangChainベースの高度な記憶システム（SQLite永続化対応）"""
 
-    def __init__(self, openai_api_key: Optional[str] = None, db_path: str = "./memories.db"):
+    def __init__(self, openai_api_key: Optional[str] = None, db_path: str = None):
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.vector_store = None
         self.embeddings = None
         self.llm = None
         self.memory_items: Dict[str, List[MemoryItem]] = {}
-        self.db_path = db_path
+        self.db_path = str(db_path or MEMORIES_DB_PATH)
 
         # SQLiteデータベースを初期化
         self._initialize_database()

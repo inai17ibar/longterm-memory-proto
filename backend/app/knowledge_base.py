@@ -9,6 +9,7 @@ from typing import List, Dict, Any, Optional
 from datetime import datetime
 from dataclasses import dataclass
 import openai
+from app.config import KNOWLEDGE_BASE_DB_PATH
 
 @dataclass
 class KnowledgeItem:
@@ -24,8 +25,8 @@ class KnowledgeItem:
 class KnowledgeBaseSystem:
     """RAG用の知識ベース管理システム"""
 
-    def __init__(self, db_path: str = "./knowledge_base.db", openai_api_key: Optional[str] = None):
-        self.db_path = db_path
+    def __init__(self, db_path: str = None, openai_api_key: Optional[str] = None):
+        self.db_path = str(db_path or KNOWLEDGE_BASE_DB_PATH)
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.client = openai.OpenAI(api_key=self.openai_api_key) if self.openai_api_key else None
         self._initialize_database()

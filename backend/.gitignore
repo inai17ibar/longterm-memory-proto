@@ -130,3 +130,11 @@ dmypy.json
 
 # FastAPI specific
 app/__pycache__/
+
+# Data files (databases and profiles)
+data/
+*.db
+*.db-journal
+
+# ChromaDB vector store
+chroma_db/

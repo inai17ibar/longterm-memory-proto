@@ -12,6 +12,13 @@ import csv
 from io import StringIO
 import re
 import asyncio
+import sys
+
+# Windowsコンソールでの文字化け対策
+if sys.platform == 'win32':
+    import codecs
+    sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
+    sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
 
 # LangChain記憶システムをインポート
 from .memory_system import memory_system, MemoryItem
@@ -301,11 +308,26 @@ async def chat_with_counselor(chat_message: ChatMessage):
     user_id = chat_message.user_id
     message = chat_message.message
 
+    # ログ: リクエスト内容を表示
+    print("\n" + "="*80)
+    print("[CHAT REQUEST - RAW JSON]")
+    import json
+    print(json.dumps({
+        "user_id": user_id,
+        "message": message
+    }, indent=2, ensure_ascii=False))
+    print("="*80)
+
     if user_id not in conversations:
         conversations[user_id] = []
 
     # 回答パターンを判断
     response_pattern = analyze_response_pattern(message, conversations[user_id])
+    print(f"\n[RESPONSE PATTERN ANALYSIS]")
+    print(f"Response Pattern: {response_pattern}")
+    print(f"  - Pattern 1: 短い相槌（15文字以内）")
+    print(f"  - Pattern 2: 傾聴型・共感（100文字程度）")
+    print(f"  - Pattern 3: 解決策提案・客観的視点（200文字程度）")
 
     # LangChainベースの記憶システムから関連する記憶を検索
     relevant_memories = await memory_system.retrieve_relevant_memories(user_id, message, limit=10)
@@ -318,6 +340,13 @@ async def chat_with_counselor(chat_message: ChatMessage):
         recent_conversations=recent_conversations,
         relevant_memories=relevant_memories
     )
+
+    print(f"\n[USER STATE ANALYSIS]")
+    if user_state:
+        import json
+        print(json.dumps(user_state, indent=2, ensure_ascii=False))
+    else:
+        print("No state analysis available")
 
     # ★ RAG: 知識ベースから関連知識を検索
     relevant_knowledge = knowledge_base.search_knowledge(message, limit=3)
@@ -426,11 +455,17 @@ async def chat_with_counselor(chat_message: ChatMessage):
 
     # デバッグログ
     if extended_profile:
-        print(f"[DEBUG] Extended Profile Settings:")
+        print(f"\n[EXTENDED PROFILE SETTINGS]")
         print(f"  - AI Name: {extended_profile.profile_settings.ai_name}")
         print(f"  - AI Personality: {extended_profile.profile_settings.ai_personality}")
         print(f"  - Display Name: {extended_profile.profile_settings.display_name}")
         print(f"  - Response Style: {extended_profile.profile_settings.response_length_style}")
+        print(f"  - Using Custom Prompt: {'Yes' if extended_profile.profile_settings.custom_system_prompt else 'No'}")
+
+    print(f"\n[SYSTEM PROMPT]")
+    print("-" * 80)
+    print(system_prompt)
+    print("-" * 80)
 
     try:
         # Mock response for testing when OpenAI API is not available
@@ -442,16 +477,45 @@ async def chat_with_counselor(chat_message: ChatMessage):
             else:  # pattern 3
                 ai_response = f"お話ししていただき、ありがとうございます。\n\n{message}について悩んでいらっしゃるのですね。一人で抱え込まずに話してくださって、とても勇気があると思います。\n\n一緒にどんなことができそうか考えてみませんか？"
         else:
-            response = client.chat.completions.create(
-                model="gpt-4.1",
-                messages=[
+            # OpenAI API リクエストのログ
+            api_request = {
+                "model": "gpt-4.1",
+                "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}
                 ],
-                max_tokens=1000 ,
-                temperature=0.7
-            )
+                "max_tokens": 1000,
+                "temperature": 0.7
+            }
+
+            # メッセージ配列を表示
+            print(f"\n[Chat] Final prompt messages")
+            import json
+            print(json.dumps(api_request["messages"], indent=2, ensure_ascii=False))
+
+            # APIリクエストメタデータ
+            print(f"\n[OPENAI API REQUEST METADATA]")
+            print(json.dumps({
+                "model": api_request["model"],
+                "max_tokens": api_request["max_tokens"],
+                "temperature": api_request["temperature"]
+            }, indent=2, ensure_ascii=False))
+
+            response = client.chat.completions.create(**api_request)
             ai_response = response.choices[0].message.content
+
+            # OpenAI API レスポンスのログ
+            print(f"\n[OPENAI API RESPONSE]")
+            print(json.dumps({
+                "model": response.model,
+                "usage": {
+                    "prompt_tokens": response.usage.prompt_tokens,
+                    "completion_tokens": response.usage.completion_tokens,
+                    "total_tokens": response.usage.total_tokens
+                },
+                "finish_reason": response.choices[0].finish_reason,
+                "response": ai_response
+            }, indent=2, ensure_ascii=False))
 
         conversations[user_id].append({
             "user_message": message,
@@ -477,6 +541,17 @@ async def chat_with_counselor(chat_message: ChatMessage):
                 extended_profile_system.sync_from_user_profile(user_id, updated_user_profile)
 
         user_info_updated = user_info_updated or profile_updated
+
+        # 最終レスポンスのログ
+        print(f"\n[FINAL RESPONSE TO CLIENT]")
+        import json
+        response_data = {
+            "response": ai_response,
+            "response_type": response_pattern,
+            "user_info_updated": user_info_updated
+        }
+        print(json.dumps(response_data, indent=2, ensure_ascii=False))
+        print("="*80 + "\n")
 
         return ChatResponse(
             response=ai_response,

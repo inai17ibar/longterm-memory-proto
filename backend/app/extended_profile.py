@@ -9,6 +9,7 @@ from typing import Dict, Any, List, Optional
 from dataclasses import dataclass, field, asdict
 from datetime import datetime
 import hashlib
+from app.config import EXTENDED_PROFILES_JSON_PATH
 
 
 @dataclass
@@ -241,8 +242,8 @@ class ExtendedUserProfile:
 class ExtendedProfileSystem:
     """拡張プロファイルシステム"""
 
-    def __init__(self, json_file_path: str = "./extended_profiles.json"):
-        self.json_file_path = json_file_path
+    def __init__(self, json_file_path: str = None):
+        self.json_file_path = str(json_file_path or EXTENDED_PROFILES_JSON_PATH)
         self.profiles: Dict[str, ExtendedUserProfile] = {}
         self.load_from_file()
 
