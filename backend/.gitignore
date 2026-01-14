@@ -138,3 +138,7 @@ data/
 
 # ChromaDB vector store
 chroma_db/
+
+# Log files
+logs/
+*.log

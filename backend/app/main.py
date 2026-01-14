@@ -13,12 +13,32 @@ from io import StringIO
 import re
 import asyncio
 import sys
+import logging
+from pathlib import Path
 
 # Windowsコンソールでの文字化け対策
 if sys.platform == 'win32':
     import codecs
     sys.stdout = codecs.getwriter('utf-8')(sys.stdout.buffer, 'strict')
     sys.stderr = codecs.getwriter('utf-8')(sys.stderr.buffer, 'strict')
+
+# ログディレクトリの作成
+log_dir = Path(__file__).parent.parent / "logs"
+log_dir.mkdir(exist_ok=True)
+
+# ログファイルの設定（日付ごとにファイルを分ける）
+log_file = log_dir / f"server_{datetime.now().strftime('%Y%m%d')}.log"
+
+# ロガーの設定
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(levelname)s - %(message)s',
+    handlers=[
+        logging.FileHandler(log_file, encoding='utf-8'),
+        logging.StreamHandler(sys.stdout)
+    ]
+)
+logger = logging.getLogger(__name__)
 
 # LangChain記憶システムをインポート
 from .memory_system import memory_system, MemoryItem
@@ -309,25 +329,24 @@ async def chat_with_counselor(chat_message: ChatMessage):
     message = chat_message.message
 
     # ログ: リクエスト内容を表示
-    print("\n" + "="*80)
-    print("[CHAT REQUEST - RAW JSON]")
-    import json
-    print(json.dumps({
+    logger.info("\n" + "="*80)
+    logger.info("[CHAT REQUEST - RAW JSON]")
+    logger.info(json.dumps({
         "user_id": user_id,
         "message": message
     }, indent=2, ensure_ascii=False))
-    print("="*80)
+    logger.info("="*80)
 
     if user_id not in conversations:
         conversations[user_id] = []
 
     # 回答パターンを判断
     response_pattern = analyze_response_pattern(message, conversations[user_id])
-    print(f"\n[RESPONSE PATTERN ANALYSIS]")
-    print(f"Response Pattern: {response_pattern}")
-    print(f"  - Pattern 1: 短い相槌（15文字以内）")
-    print(f"  - Pattern 2: 傾聴型・共感（100文字程度）")
-    print(f"  - Pattern 3: 解決策提案・客観的視点（200文字程度）")
+    logger.info(f"\n[RESPONSE PATTERN ANALYSIS]")
+    logger.info(f"Response Pattern: {response_pattern}")
+    logger.info(f"  - Pattern 1: 短い相槌（15文字以内）")
+    logger.info(f"  - Pattern 2: 傾聴型・共感（100文字程度）")
+    logger.info(f"  - Pattern 3: 解決策提案・客観的視点（200文字程度）")
 
     # LangChainベースの記憶システムから関連する記憶を検索
     relevant_memories = await memory_system.retrieve_relevant_memories(user_id, message, limit=10)
@@ -341,12 +360,11 @@ async def chat_with_counselor(chat_message: ChatMessage):
         relevant_memories=relevant_memories
     )
 
-    print(f"\n[USER STATE ANALYSIS]")
+    logger.info(f"\n[USER STATE ANALYSIS]")
     if user_state:
-        import json
-        print(json.dumps(user_state, indent=2, ensure_ascii=False))
+        logger.info(json.dumps(user_state, indent=2, ensure_ascii=False))
     else:
-        print("No state analysis available")
+        logger.info("No state analysis available")
 
     # ★ RAG: 知識ベースから関連知識を検索
     relevant_knowledge = knowledge_base.search_knowledge(message, limit=3)
@@ -455,17 +473,17 @@ async def chat_with_counselor(chat_message: ChatMessage):
 
     # デバッグログ
     if extended_profile:
-        print(f"\n[EXTENDED PROFILE SETTINGS]")
-        print(f"  - AI Name: {extended_profile.profile_settings.ai_name}")
-        print(f"  - AI Personality: {extended_profile.profile_settings.ai_personality}")
-        print(f"  - Display Name: {extended_profile.profile_settings.display_name}")
-        print(f"  - Response Style: {extended_profile.profile_settings.response_length_style}")
-        print(f"  - Using Custom Prompt: {'Yes' if extended_profile.profile_settings.custom_system_prompt else 'No'}")
+        logger.info(f"\n[EXTENDED PROFILE SETTINGS]")
+        logger.info(f"  - AI Name: {extended_profile.profile_settings.ai_name}")
+        logger.info(f"  - AI Personality: {extended_profile.profile_settings.ai_personality}")
+        logger.info(f"  - Display Name: {extended_profile.profile_settings.display_name}")
+        logger.info(f"  - Response Style: {extended_profile.profile_settings.response_length_style}")
+        logger.info(f"  - Using Custom Prompt: {'Yes' if extended_profile.profile_settings.custom_system_prompt else 'No'}")
 
-    print(f"\n[SYSTEM PROMPT]")
-    print("-" * 80)
-    print(system_prompt)
-    print("-" * 80)
+    logger.info(f"\n[SYSTEM PROMPT]")
+    logger.info("-" * 80)
+    logger.info(system_prompt)
+    logger.info("-" * 80)
 
     try:
         # Mock response for testing when OpenAI API is not available
@@ -489,13 +507,12 @@ async def chat_with_counselor(chat_message: ChatMessage):
             }
 
             # メッセージ配列を表示
-            print(f"\n[Chat] Final prompt messages")
-            import json
-            print(json.dumps(api_request["messages"], indent=2, ensure_ascii=False))
+            logger.info(f"\n[Chat] Final prompt messages")
+            logger.info(json.dumps(api_request["messages"], indent=2, ensure_ascii=False))
 
             # APIリクエストメタデータ
-            print(f"\n[OPENAI API REQUEST METADATA]")
-            print(json.dumps({
+            logger.info(f"\n[OPENAI API REQUEST METADATA]")
+            logger.info(json.dumps({
                 "model": api_request["model"],
                 "max_tokens": api_request["max_tokens"],
                 "temperature": api_request["temperature"]
@@ -505,8 +522,8 @@ async def chat_with_counselor(chat_message: ChatMessage):
             ai_response = response.choices[0].message.content
 
             # OpenAI API レスポンスのログ
-            print(f"\n[OPENAI API RESPONSE]")
-            print(json.dumps({
+            logger.info(f"\n[OPENAI API RESPONSE]")
+            logger.info(json.dumps({
                 "model": response.model,
                 "usage": {
                     "prompt_tokens": response.usage.prompt_tokens,
@@ -543,15 +560,14 @@ async def chat_with_counselor(chat_message: ChatMessage):
         user_info_updated = user_info_updated or profile_updated
 
         # 最終レスポンスのログ
-        print(f"\n[FINAL RESPONSE TO CLIENT]")
-        import json
+        logger.info(f"\n[FINAL RESPONSE TO CLIENT]")
         response_data = {
             "response": ai_response,
             "response_type": response_pattern,
             "user_info_updated": user_info_updated
         }
-        print(json.dumps(response_data, indent=2, ensure_ascii=False))
-        print("="*80 + "\n")
+        logger.info(json.dumps(response_data, indent=2, ensure_ascii=False))
+        logger.info("="*80 + "\n")
 
         return ChatResponse(
             response=ai_response,
@@ -642,7 +658,7 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
             if any(word in message_lower for word in ['気持ち', '感情', '落ち込み', '嬉しい', '悲しい', '怒り']):
                 extracted_info['emotional_state'] = user_message
             
-            print(f"Mock extraction result: {extracted_info}")
+            logger.debug(f"Mock extraction result: {extracted_info}")
         else:
             extraction_prompt = f"""
 以下のユーザーメッセージからメンタルヘルス関連情報と個人情報を抽出してください。
@@ -732,7 +748,7 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
                         }
                         current_data["memory_items"].append(memory_item)
                         updated = True
-                        print(f"Added memory item: {field} = {field_value}")
+                        logger.debug(f"Added memory item: {field} = {field_value}")
 
                         # LangChain memory_systemにも保存
                         await memory_system.store_memory(
@@ -817,7 +833,7 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
         return updated
         
     except Exception as e:
-        print(f"Error in extract_user_info: {e}")
+        logger.error(f"Error in extract_user_info: {e}")
         return False
 
 @app.get("/api/conversations/{user_id}")
