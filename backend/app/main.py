@@ -830,27 +830,144 @@ async def get_conversation_history(user_id: str):
 
 @app.get("/api/export-conversations/{user_id}")
 async def export_conversations_csv(user_id: str):
-    """Export conversation history as CSV"""
+    """Export conversation history as CSV in index, role, content format"""
     if user_id not in conversations:
         raise HTTPException(status_code=404, detail="No conversations found for user")
-    
+
     output = StringIO()
     writer = csv.writer(output)
-    
-    writer.writerow(["timestamp", "user_message", "ai_response", "response_pattern"])
-    
+
+    # ヘッダー行
+    writer.writerow(["index", "role", "content"])
+
+    index = 1
     for conv in conversations[user_id]:
-        writer.writerow([
-            conv["timestamp"],
-            conv["user_message"],
-            conv["ai_response"],
-            conv.get("response_pattern", "unknown")
-        ])
-    
+        # ユーザーメッセージ
+        writer.writerow([index, "user", conv["user_message"]])
+        index += 1
+
+        # AIレスポンス（systemではなくassistantロールを使用）
+        writer.writerow([index, "assistant", conv["ai_response"]])
+        index += 1
+
     csv_content = output.getvalue()
     output.close()
-    
+
     return {"csv_data": csv_content, "filename": f"conversations_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+
+@app.get("/api/export-system-prompt/{user_id}")
+async def export_system_prompt_csv(user_id: str):
+    """Export system prompt settings as CSV"""
+    profile = extended_profile_system.get_profile(user_id)
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    output = StringIO()
+    writer = csv.writer(output)
+
+    # ヘッダー行
+    writer.writerow(["setting", "value"])
+
+    # プロファイル設定
+    settings = profile.profile_settings
+    writer.writerow(["display_name", settings.display_name])
+    writer.writerow(["ai_name", settings.ai_name])
+    writer.writerow(["ai_personality", settings.ai_personality])
+    writer.writerow(["ai_expectation", settings.ai_expectation])
+    writer.writerow(["response_length_style", settings.response_length_style])
+
+    # カスタムシステムプロンプト
+    if settings.custom_system_prompt:
+        writer.writerow(["custom_system_prompt", settings.custom_system_prompt])
+    else:
+        # デフォルトプロンプトを取得
+        writer.writerow(["custom_system_prompt", "(デフォルトプロンプトを使用)"])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return {"csv_data": csv_content, "filename": f"system_prompt_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+
+@app.get("/api/export-profile/{user_id}")
+async def export_profile_csv(user_id: str):
+    """Export user profile as CSV"""
+    profile = extended_profile_system.get_profile(user_id)
+
+    if not profile:
+        raise HTTPException(status_code=404, detail="User profile not found")
+
+    output = StringIO()
+    writer = csv.writer(output)
+
+    # ヘッダー行
+    writer.writerow(["category", "field", "value"])
+
+    # 基本情報
+    general = profile.general_profile
+    if general.hobbies:
+        writer.writerow(["基本情報", "趣味", ", ".join(general.hobbies)])
+    if general.occupation:
+        writer.writerow(["基本情報", "職業", general.occupation])
+    if general.location:
+        writer.writerow(["基本情報", "住所", general.location])
+    if general.age:
+        writer.writerow(["基本情報", "年齢", general.age])
+    if general.family:
+        writer.writerow(["基本情報", "家族", general.family])
+
+    # メンタルプロファイル
+    mental = profile.mental_profile
+    if mental.current_mental_state:
+        writer.writerow(["メンタルヘルス", "現在の状態", mental.current_mental_state])
+    if mental.recent_medication_change:
+        writer.writerow(["メンタルヘルス", "服薬・通院", mental.recent_medication_change])
+    if mental.symptoms:
+        writer.writerow(["メンタルヘルス", "症状", mental.symptoms])
+    if mental.triggers:
+        writer.writerow(["メンタルヘルス", "ストレス要因", mental.triggers])
+    if mental.coping_methods:
+        writer.writerow(["メンタルヘルス", "対処法", mental.coping_methods])
+    if mental.support_system:
+        writer.writerow(["メンタルヘルス", "サポート体制", mental.support_system])
+
+    # お気に入り
+    fav = profile.favorites
+    if fav.favorite_food:
+        writer.writerow(["お気に入り", "食べ物", fav.favorite_food])
+    if fav.drink:
+        writer.writerow(["お気に入り", "飲み物", fav.drink])
+    if fav.favorite_animal:
+        writer.writerow(["お気に入り", "動物", fav.favorite_animal])
+    if fav.tv_drama:
+        writer.writerow(["お気に入り", "ドラマ", fav.tv_drama])
+    if fav.comedian:
+        writer.writerow(["お気に入り", "芸人", fav.comedian])
+
+    # 重要な記憶
+    for i, mem in enumerate(profile.important_memories[-10:], 1):  # 最新10件
+        writer.writerow(["重要な記憶", f"記憶{i} ({mem.importance})", mem.text])
+
+    # 現在の悩み
+    for category, concerns in profile.recent_concerns.items():
+        active_concerns = [c for c in concerns if c.status == "継続中"]
+        for i, concern in enumerate(active_concerns, 1):
+            writer.writerow(["悩み・懸念", f"{category} {i}", f"{concern.summary}: {concern.details}"])
+
+    # 目標
+    active_goals = [g for g in profile.goals if g.status == "active"]
+    for i, goal in enumerate(active_goals, 1):
+        writer.writerow(["目標", f"目標{i} ({goal.importance})", goal.goal])
+
+    # 気分傾向
+    if profile.user_tendency.insight:
+        writer.writerow(["気分傾向", "インサイト", profile.user_tendency.insight])
+        writer.writerow(["気分傾向", "主な気分", profile.user_tendency.dominant_mood])
+
+    csv_content = output.getvalue()
+    output.close()
+
+    return {"csv_data": csv_content, "filename": f"profile_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
 
 @app.delete("/api/conversations/{user_id}")
 async def clear_conversations(user_id: str):
