@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { MemoryDisplay } from './MemoryDisplay';
 import { ExtendedProfileManager } from './ExtendedProfileManager';
 import { SystemPromptEditor } from './SystemPromptEditor';
+import { ModelSettings } from './ModelSettings';
 
 function App() {
   const [currentMessage, setCurrentMessage] = useState('');
@@ -169,21 +170,37 @@ function App() {
   const exportConversations = async () => {
     setIsExporting(true);
     try {
-      const response = await fetch(`${API_URL}/api/export-conversations/${userId}`);
-      if (response.ok) {
-        const data = await response.json();
-        
-        const blob = new Blob([data.csv_data], { type: 'text/csv' });
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = data.filename;
-        document.body.appendChild(a);
-        a.click();
-        window.URL.revokeObjectURL(url);
-        document.body.removeChild(a);
-      } else {
-        setError('会話履歴のエクスポートに失敗しました');
+      // 会話履歴、システムプロンプト、ユーザープロファイルの3つをダウンロード
+      const endpoints = [
+        { url: `${API_URL}/api/export-conversations/${userId}`, name: '会話履歴', type: 'text/csv' },
+        { url: `${API_URL}/api/export-system-prompt/${userId}`, name: 'システムプロンプト', type: 'text/csv' },
+        { url: `${API_URL}/api/export-profile/${userId}`, name: 'ユーザープロファイル', type: 'application/json' }
+      ];
+
+      for (const endpoint of endpoints) {
+        try {
+          const response = await fetch(endpoint.url);
+          if (response.ok) {
+            const data = await response.json();
+
+            const blob = new Blob([data.csv_data], { type: endpoint.type });
+            const url = window.URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = data.filename;
+            document.body.appendChild(a);
+            a.click();
+            window.URL.revokeObjectURL(url);
+            document.body.removeChild(a);
+
+            // ブラウザがダウンロードを処理する時間を確保
+            await new Promise(resolve => setTimeout(resolve, 100));
+          } else {
+            console.warn(`${endpoint.name}のエクスポートに失敗しました`);
+          }
+        } catch (error) {
+          console.error(`${endpoint.name}のエクスポート中にエラー:`, error);
+        }
       }
     } catch (error) {
       setError('エクスポート中にエラーが発生しました');
@@ -434,6 +451,9 @@ function App() {
               </button>
             </div>
           </div>
+
+          {/* GPTモデル設定カード */}
+          <ModelSettings userId={userId} apiUrl={API_URL} />
 
           {/* システムプロンプト編集カード */}
           <SystemPromptEditor userId={userId} apiUrl={API_URL} />
@@ -830,7 +850,7 @@ function App() {
               <p style={{ fontSize: '11px', color: '#6b7280', textAlign: 'center', margin: '0 8px' }}>
                 ※記憶された情報も全て削除されます
               </p>
-              <button 
+              <button
                 onClick={exportConversations}
                 disabled={isExporting}
                 style={{
@@ -849,7 +869,7 @@ function App() {
                   opacity: isExporting ? 0.5 : 1
                 }}
               >
-                📥 {isExporting ? 'エクスポート中...' : '会話履歴をCSVでダウンロード'}
+                📥 {isExporting ? 'エクスポート中...' : '会話履歴と設定をCSVでダウンロード'}
               </button>
               <p style={{ fontSize: '12px', color: '#6b7280', textAlign: 'center', marginTop: '8px' }}>
                 ユーザーID: {userId.slice(-8)}...

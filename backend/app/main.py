@@ -495,15 +495,22 @@ async def chat_with_counselor(chat_message: ChatMessage):
             else:  # pattern 3
                 ai_response = f"お話ししていただき、ありがとうございます。\n\n{message}について悩んでいらっしゃるのですね。一人で抱え込まずに話してくださって、とても勇気があると思います。\n\n一緒にどんなことができそうか考えてみませんか？"
         else:
+            # ユーザーのモデル設定を取得
+            user_model_settings = model_settings_storage.get(user_id, {
+                "model": "gpt-4o",
+                "temperature": 0.7,
+                "max_tokens": 500
+            })
+
             # OpenAI API リクエストのログ
             api_request = {
-                "model": "gpt-4.1",
+                "model": user_model_settings["model"],
                 "messages": [
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": message}
                 ],
-                "max_tokens": 1000,
-                "temperature": 0.7
+                "max_tokens": user_model_settings["max_tokens"],
+                "temperature": user_model_settings["temperature"]
             }
 
             # メッセージ配列を表示
@@ -912,83 +919,80 @@ async def export_system_prompt_csv(user_id: str):
 
 @app.get("/api/export-profile/{user_id}")
 async def export_profile_csv(user_id: str):
-    """Export user profile as CSV"""
+    """Export user profile as JSON"""
     profile = extended_profile_system.get_profile(user_id)
 
     if not profile:
         raise HTTPException(status_code=404, detail="User profile not found")
 
-    output = StringIO()
-    writer = csv.writer(output)
-
-    # ヘッダー行
-    writer.writerow(["category", "field", "value"])
-
-    # 基本情報
-    general = profile.general_profile
-    if general.hobbies:
-        writer.writerow(["基本情報", "趣味", ", ".join(general.hobbies)])
-    if general.occupation:
-        writer.writerow(["基本情報", "職業", general.occupation])
-    if general.location:
-        writer.writerow(["基本情報", "住所", general.location])
-    if general.age:
-        writer.writerow(["基本情報", "年齢", general.age])
-    if general.family:
-        writer.writerow(["基本情報", "家族", general.family])
-
-    # メンタルプロファイル
-    mental = profile.mental_profile
-    if mental.current_mental_state:
-        writer.writerow(["メンタルヘルス", "現在の状態", mental.current_mental_state])
-    if mental.recent_medication_change:
-        writer.writerow(["メンタルヘルス", "服薬・通院", mental.recent_medication_change])
-    if mental.symptoms:
-        writer.writerow(["メンタルヘルス", "症状", mental.symptoms])
-    if mental.triggers:
-        writer.writerow(["メンタルヘルス", "ストレス要因", mental.triggers])
-    if mental.coping_methods:
-        writer.writerow(["メンタルヘルス", "対処法", mental.coping_methods])
-    if mental.support_system:
-        writer.writerow(["メンタルヘルス", "サポート体制", mental.support_system])
-
-    # お気に入り
-    fav = profile.favorites
-    if fav.favorite_food:
-        writer.writerow(["お気に入り", "食べ物", fav.favorite_food])
-    if fav.drink:
-        writer.writerow(["お気に入り", "飲み物", fav.drink])
-    if fav.favorite_animal:
-        writer.writerow(["お気に入り", "動物", fav.favorite_animal])
-    if fav.tv_drama:
-        writer.writerow(["お気に入り", "ドラマ", fav.tv_drama])
-    if fav.comedian:
-        writer.writerow(["お気に入り", "芸人", fav.comedian])
-
-    # 重要な記憶
-    for i, mem in enumerate(profile.important_memories[-10:], 1):  # 最新10件
-        writer.writerow(["重要な記憶", f"記憶{i} ({mem.importance})", mem.text])
-
-    # 現在の悩み
+    # 拡張プロファイルを新しいJSON形式にマッピング
+    # recent_concerns を work と mental に分類
+    recent_concerns_dict = {}
     for category, concerns in profile.recent_concerns.items():
-        active_concerns = [c for c in concerns if c.status == "継続中"]
-        for i, concern in enumerate(active_concerns, 1):
-            writer.writerow(["悩み・懸念", f"{category} {i}", f"{concern.summary}: {concern.details}"])
+        if concerns and len(concerns) > 0:
+            # 最初の懸念事項を文字列として追加
+            recent_concerns_dict[category] = concerns[0].summary if hasattr(concerns[0], 'summary') else str(concerns[0])
 
-    # 目標
-    active_goals = [g for g in profile.goals if g.status == "active"]
-    for i, goal in enumerate(active_goals, 1):
-        writer.writerow(["目標", f"目標{i} ({goal.importance})", goal.goal])
+    export_data = {
+        "user_id": profile.user_id,
+        "profile_settings": {
+            "display_name": profile.profile_settings.display_name,
+            "ai_name": profile.profile_settings.ai_name,
+            "ai_personality": profile.profile_settings.ai_personality,
+            "ai_expectation": profile.profile_settings.ai_expectation,
+            "response_length_style": profile.profile_settings.response_length_style,
+            "profile_initialized_at": profile.profile_settings.profile_initialized_at
+        },
+        "general_profile": {
+            "hobbies": profile.general_profile.hobbies if profile.general_profile.hobbies else [],
+            "occupation": profile.general_profile.occupation,
+            "location": profile.general_profile.location,
+            "age": profile.general_profile.age,
+            "family": profile.general_profile.family
+        },
+        "mental_profile": {
+            "recent_medication_change": profile.mental_profile.recent_medication_change,
+            "current_mental_state": profile.mental_profile.current_mental_state,
+            "symptoms": profile.mental_profile.symptoms if profile.mental_profile.symptoms else [],
+            "triggers": profile.mental_profile.triggers if profile.mental_profile.triggers else [],
+            "coping_methods": profile.mental_profile.coping_methods if profile.mental_profile.coping_methods else [],
+            "support_system": profile.mental_profile.support_system if profile.mental_profile.support_system else []
+        },
+        "favorites": {
+            "favorite_food": profile.favorites.favorite_food,
+            "favorite_animal": profile.favorites.favorite_animal,
+            "beverage": profile.favorites.drink,
+            "extra": profile.favorites.extra if profile.favorites.extra else {}
+        },
+        "important_memories": [mem.text for mem in profile.important_memories] if profile.important_memories else [],
+        "recent_concerns": recent_concerns_dict,
+        "goals": [goal.goal for goal in profile.goals if goal.status == "active"] if profile.goals else [],
+        "relationships": profile.relationships if profile.relationships else {},
+        "environments": profile.environments if profile.environments else {},
+        "mood_trend": [
+            {
+                "date": mood.date,
+                "mood": mood.mood,
+                "intensity": mood.intensity
+            } for mood in profile.mood_trend[-20:]
+        ] if profile.mood_trend else [],
+        "user_tendency": {
+            "dominant_mood": profile.user_tendency.dominant_mood,
+            "counts": profile.user_tendency.counts if profile.user_tendency.counts else {},
+            "recent_intensity": profile.user_tendency.recent_intensity,
+            "last_observed": profile.user_tendency.last_observed,
+            "insight": profile.user_tendency.insight,
+            "time_patterns": profile.user_tendency.time_patterns if profile.user_tendency.time_patterns else []
+        }
+    }
 
-    # 気分傾向
-    if profile.user_tendency.insight:
-        writer.writerow(["気分傾向", "インサイト", profile.user_tendency.insight])
-        writer.writerow(["気分傾向", "主な気分", profile.user_tendency.dominant_mood])
+    # JSON形式でエクスポート
+    json_content = json.dumps(export_data, ensure_ascii=False, indent=2)
 
-    csv_content = output.getvalue()
-    output.close()
-
-    return {"csv_data": csv_content, "filename": f"profile_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv"}
+    return {
+        "csv_data": json_content,
+        "filename": f"profile_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.json"
+    }
 
 @app.delete("/api/conversations/{user_id}")
 async def clear_conversations(user_id: str):
@@ -1261,5 +1265,35 @@ response_pattern={response_pattern}に応じて以下のように応答してく
             "{response_pattern}"
         ],
         "description": "システムプロンプトテンプレート。変数は実行時に自動置換されます。"
+    }
+
+# モデル設定保存用のディクショナリ（ユーザーごと）
+model_settings_storage: Dict[str, Dict[str, Any]] = {}
+
+@app.get("/api/model-settings/{user_id}")
+async def get_model_settings(user_id: str):
+    """ユーザーのGPTモデル設定を取得"""
+    if user_id in model_settings_storage:
+        return model_settings_storage[user_id]
+
+    # デフォルト設定
+    return {
+        "model": "gpt-4o",
+        "temperature": 0.7,
+        "max_tokens": 500
+    }
+
+@app.post("/api/model-settings/{user_id}")
+async def update_model_settings(user_id: str, settings: Dict[str, Any]):
+    """ユーザーのGPTモデル設定を更新"""
+    model_settings_storage[user_id] = {
+        "model": settings.get("model", "gpt-4o"),
+        "temperature": settings.get("temperature", 0.7),
+        "max_tokens": settings.get("max_tokens", 500)
+    }
+
+    return {
+        "status": "success",
+        "settings": model_settings_storage[user_id]
     }
 

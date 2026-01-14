@@ -69,7 +69,7 @@ export const ExtendedProfileManager: React.FC<ExtendedProfileManagerProps> = ({ 
       marginBottom: '20px'
     }}>
       <h2 style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '16px' }}>
-        📋 拡張プロファイル管理
+        📋 ユーザプロファイル管理
       </h2>
 
       {message && (
