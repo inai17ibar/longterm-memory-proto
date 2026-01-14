@@ -1,14 +1,9 @@
 import React, { useState, useEffect } from 'react';
+import './ModelSettings.css';
 
 interface ModelSettingsProps {
   userId: string;
   apiUrl: string;
-}
-
-interface ModelConfig {
-  model: string;
-  temperature: number;
-  max_tokens: number;
 }
 
 export const ModelSettings: React.FC<ModelSettingsProps> = ({ userId, apiUrl }) => {
@@ -95,20 +90,14 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({ userId, apiUrl }) 
       <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
         {/* モデル選択 */}
         <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>
+          <label htmlFor="model" style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>
             モデル
           </label>
           <select
+            id="model"
             value={model}
             onChange={(e) => setModel(e.target.value)}
-            style={{
-              width: '100%',
-              padding: '8px 12px',
-              border: '1px solid #d1d5db',
-              borderRadius: '8px',
-              fontSize: '14px',
-              backgroundColor: 'white'
-            }}
+            className="model-select"
           >
             <option value="o1">o1 (最新・最高性能)</option>
             <option value="o1-mini">o1-mini (推論特化・高速)</option>
@@ -125,10 +114,11 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({ userId, apiUrl }) 
 
         {/* Temperature設定 */}
         <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>
+          <label htmlFor="temperature" style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>
             Temperature: {temperature.toFixed(2)}
           </label>
           <input
+            id="temperature"
             type="range"
             min="0"
             max="2"
@@ -149,10 +139,11 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({ userId, apiUrl }) 
 
         {/* Max Tokens設定 */}
         <div>
-          <label style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>
+          <label htmlFor="maxTokens" style={{ display: 'block', fontSize: '14px', fontWeight: '500', marginBottom: '8px', color: '#374151' }}>
             最大トークン数: {maxTokens}
           </label>
           <input
+            id="maxTokens"
             type="range"
             min="100"
             max="4000"
