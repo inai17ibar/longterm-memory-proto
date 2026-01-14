@@ -830,7 +830,7 @@ async def get_conversation_history(user_id: str):
 
 @app.get("/api/export-conversations/{user_id}")
 async def export_conversations_csv(user_id: str):
-    """Export conversation history as CSV in index, role, content format"""
+    """Export conversation history as CSV in index, role, content, timestamp, response_pattern format"""
     if user_id not in conversations:
         raise HTTPException(status_code=404, detail="No conversations found for user")
 
@@ -838,16 +838,21 @@ async def export_conversations_csv(user_id: str):
     writer = csv.writer(output)
 
     # ヘッダー行
-    writer.writerow(["index", "role", "content"])
+    writer.writerow(["index", "role", "content", "timestamp", "response_pattern"])
 
     index = 1
     for conv in conversations[user_id]:
-        # ユーザーメッセージ
-        writer.writerow([index, "user", conv["user_message"]])
+        timestamp = conv.get("timestamp", "")
+        response_pattern = conv.get("response_pattern", "")
+
+        # ユーザーメッセージ（改行を\nに置換）
+        user_message = conv["user_message"].replace('\n', '\\n').replace('\r', '')
+        writer.writerow([index, "user", user_message, timestamp, ""])
         index += 1
 
-        # AIレスポンス（systemではなくassistantロールを使用）
-        writer.writerow([index, "assistant", conv["ai_response"]])
+        # AIレスポンス（改行を\nに置換）
+        ai_response = conv["ai_response"].replace('\n', '\\n').replace('\r', '')
+        writer.writerow([index, "assistant", ai_response, timestamp, response_pattern])
         index += 1
 
     csv_content = output.getvalue()

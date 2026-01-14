@@ -33,6 +33,7 @@ function App() {
     metadata: Record<string, any>;
   }>>([]);
   const [isExporting, setIsExporting] = useState(false);
+  const [isUserDbExpanded, setIsUserDbExpanded] = useState(false);
 
   const API_URL = 'http://localhost:8000'; // process.env.REACT_APP_API_URL || 'http://localhost:8000';
 
@@ -448,10 +449,24 @@ function App() {
             border: '1px solid #f3f4f6',
             padding: '24px'
           }}>
-            <h2 style={{ fontWeight: 'bold', fontSize: '18px', marginBottom: '16px' }}>
-              📊 ユーザDB
-            </h2>
-            {langchainMemories.length > 0 ? (
+            <div
+              onClick={() => setIsUserDbExpanded(!isUserDbExpanded)}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'space-between',
+                cursor: 'pointer',
+                marginBottom: isUserDbExpanded ? '16px' : '0'
+              }}
+            >
+              <h2 style={{ fontWeight: 'bold', fontSize: '18px', margin: 0 }}>
+                📊 ユーザDB（会話から抽出）
+              </h2>
+              <span style={{ fontSize: '20px', transition: 'transform 0.2s', transform: isUserDbExpanded ? 'rotate(180deg)' : 'rotate(0deg)' }}>
+                ▼
+              </span>
+            </div>
+            {isUserDbExpanded && (langchainMemories.length > 0 ? (
               <MemoryDisplay memories={langchainMemories} userInfo={userInfo} />
             ) : userInfo ? (
               <div style={{ display: 'flex', flexDirection: 'column', gap: '16px' }}>
@@ -756,7 +771,7 @@ function App() {
               <p style={{ fontSize: '14px', color: '#6b7280' }}>
                 まだ情報が記録されていません。会話を通じて情報を教えてください。
               </p>
-            )}
+            ))}
           </div>
 
           {/* 設定カード */}
