@@ -1,10 +1,12 @@
 """
 エピソード記憶システムのテストスクリプト
 """
-import sys
 import asyncio
+import sys
 from datetime import datetime, timedelta
-from app.episodic_memory import episodic_memory_system, Episode, EmotionRecord
+
+from app.episodic_memory import Episode, episodic_memory_system
+
 
 def test_emotion_recording():
     """感情記録のテスト"""
@@ -22,7 +24,7 @@ def test_emotion_recording():
             "anxiety": 3,
             "primary_emotion": "happy",
             "triggers": ["良い天気", "散歩"],
-            "notes": "気分が良い日"
+            "notes": "気分が良い日",
         },
         {
             "mood": 4,
@@ -30,7 +32,7 @@ def test_emotion_recording():
             "anxiety": 7,
             "primary_emotion": "anxious",
             "triggers": ["仕事のプレッシャー"],
-            "notes": "不安が強い"
+            "notes": "不安が強い",
         },
         {
             "mood": 5,
@@ -38,8 +40,8 @@ def test_emotion_recording():
             "anxiety": 5,
             "primary_emotion": "neutral",
             "triggers": [],
-            "notes": "普通の状態"
-        }
+            "notes": "普通の状態",
+        },
     ]
 
     print("\n感情記録を追加中...")
@@ -51,7 +53,7 @@ def test_emotion_recording():
             anxiety=case["anxiety"],
             primary_emotion=case["primary_emotion"],
             triggers=case["triggers"],
-            notes=case["notes"]
+            notes=case["notes"],
         )
         print(f"  [{idx}] 記録ID: {emotion_id}")
         print(f"      気分={case['mood']}, エネルギー={case['energy']}, 不安={case['anxiety']}")
@@ -76,11 +78,11 @@ def test_emotion_recording():
     print(f"  平均不安: {trends.get('average_anxiety', 0):.2f}")
     print(f"  データ件数: {trends.get('data_points', 0)}")
 
-    if trends.get('data_points', 0) == len(test_cases):
+    if trends.get("data_points", 0) == len(test_cases):
         print("  [PASS] トレンド分析が正しく動作しました")
         return True
     else:
-        print(f"  [FAIL] トレンドのデータ件数が不一致")
+        print("  [FAIL] トレンドのデータ件数が不一致")
         return False
 
 
@@ -97,13 +99,13 @@ async def test_episode_extraction():
         {
             "user_message": "今日は久しぶりに友達と会えて、とても嬉しかったです。公園を散歩しながら色々話しました。",
             "ai_response": "それは良かったですね。友達との時間は大切ですね。",
-            "expected_emotion": "happy"
+            "expected_emotion": "happy",
         },
         {
             "user_message": "今朝、またパニック発作が起きてしまいました。息苦しくて、手が震えて…",
             "ai_response": "それは辛かったですね。今は落ち着いていますか？",
-            "expected_emotion": "anxious"
-        }
+            "expected_emotion": "anxious",
+        },
     ]
 
     print("\nエピソード抽出中（LLM使用）...")
@@ -117,21 +119,17 @@ async def test_episode_extraction():
             user_id=test_user,
             user_message=conv["user_message"],
             ai_response=conv["ai_response"],
-            current_emotion_state={
-                "mood": 5,
-                "energy": 5,
-                "anxiety": 5
-            }
+            current_emotion_state={"mood": 5, "energy": 5, "anxiety": 5},
         )
 
         if episode:
-            print(f"  ✓ エピソード抽出成功")
+            print("  ✓ エピソード抽出成功")
             print(f"    タイトル: {episode.title}")
             print(f"    感情: {episode.emotion} (強度: {episode.emotion_intensity:.2f})")
             print(f"    重要度: {episode.importance_score:.2f}")
             extracted_count += 1
         else:
-            print(f"  - エピソード未抽出")
+            print("  - エピソード未抽出")
 
     # エピソード取得
     print("\nエピソード記憶を取得中...")
@@ -171,7 +169,7 @@ def test_episode_filtering():
             timestamp=datetime.now() - timedelta(days=idx),
             context={},
             related_episodes=[],
-            importance_score=0.8
+            importance_score=0.8,
         )
         episodic_memory_system._save_episode(episode)
 
@@ -181,9 +179,7 @@ def test_episode_filtering():
 
     # 感情フィルタ
     happy_episodes = episodic_memory_system.get_episodes(
-        test_user,
-        limit=10,
-        emotion_filter="happy"
+        test_user, limit=10, emotion_filter="happy"
     )
     print(f"happyエピソード: {len(happy_episodes)}件")
 

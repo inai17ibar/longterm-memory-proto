@@ -1,16 +1,11 @@
 """
 RAGシステムのテストスクリプト
 """
+
 import requests
-import json
 
 # テストメッセージ
-test_cases = [
-    {
-        "user_id": "test_rag_user_001",
-        "message": "不安で眠れない"
-    }
-]
+test_cases = [{"user_id": "test_rag_user_001", "message": "不安で眠れない"}]
 
 print("=" * 60)
 print("RAGシステムのテスト")
@@ -22,16 +17,12 @@ for idx, test_case in enumerate(test_cases, 1):
     print("-" * 60)
 
     try:
-        response = requests.post(
-            "http://localhost:8000/api/chat",
-            json=test_case,
-            timeout=30
-        )
+        response = requests.post("http://localhost:8000/api/chat", json=test_case, timeout=30)
 
         if response.status_code == 200:
             data = response.json()
-            print(f"\nAI応答:")
-            print(data['response'])
+            print("\nAI応答:")
+            print(data["response"])
             print(f"\n応答パターン: {data['response_type']}")
             print(f"ユーザー情報更新: {data['user_info_updated']}")
         else:
@@ -53,7 +44,7 @@ try:
     kb_response = requests.get(
         "http://localhost:8000/api/knowledge/search",
         params={"query": "不安で眠れない", "limit": 3},
-        timeout=10
+        timeout=10,
     )
 
     if kb_response.status_code == 200:
@@ -61,7 +52,7 @@ try:
         print(f"\n検索クエリ: {kb_data['query']}")
         print(f"ヒット数: {len(kb_data['knowledge'])}件\n")
 
-        for idx, item in enumerate(kb_data['knowledge'], 1):
+        for idx, item in enumerate(kb_data["knowledge"], 1):
             print(f"{idx}. 【{item['title']}】")
             print(f"   カテゴリ: {item['category']}")
             print(f"   内容: {item['content'][:150]}...")

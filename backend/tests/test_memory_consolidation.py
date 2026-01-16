@@ -1,11 +1,13 @@
 """
 記憶統合・関連性分析システムのテストスクリプト
 """
-import sys
 import asyncio
+import sys
 from datetime import datetime, timedelta
-from app.memory_system import memory_system, MemoryItem
+
 from app.memory_consolidation import memory_consolidation, memory_relationship
+from app.memory_system import MemoryItem, memory_system
+
 
 async def test_memory_consolidation():
     """記憶統合のテスト"""
@@ -20,7 +22,7 @@ async def test_memory_consolidation():
         "散歩が好きです",
         "歩くのが好き",
         "ウォーキングを楽しんでいます",
-        "公園を歩くことが趣味です"
+        "公園を歩くことが趣味です",
     ]
 
     print("\n類似記憶を追加中...")
@@ -29,7 +31,7 @@ async def test_memory_consolidation():
             user_id=test_user,
             content=content,
             memory_type="coping_methods",
-            metadata={"source": "test"}
+            metadata={"source": "test"},
         )
         if memory_id:
             print(f"  [{idx+1}] {content}")
@@ -41,9 +43,7 @@ async def test_memory_consolidation():
     # 記憶を統合
     print("\n記憶を統合中（LLM使用）...")
     consolidated = await memory_consolidation.consolidate_similar_memories(
-        user_id=test_user,
-        memory_type="coping_methods",
-        similarity_threshold=0.5
+        user_id=test_user, memory_type="coping_methods", similarity_threshold=0.5
     )
 
     print(f"統合された記憶グループ: {len(consolidated)}グループ")
@@ -74,29 +74,23 @@ async def test_memory_summary():
         ("パニック発作", "symptoms"),
         ("深呼吸が効果的", "coping_methods"),
         ("復職を目指している", "goals"),
-        ("薬を飲んでいる", "medication")
+        ("薬を飲んでいる", "medication"),
     ]
 
     print("\nテスト記憶を追加中...")
     for content, mem_type in test_memories:
         memory_id = await memory_system.store_memory(
-            user_id=test_user,
-            content=content,
-            memory_type=mem_type,
-            metadata={"source": "test"}
+            user_id=test_user, content=content, memory_type=mem_type, metadata={"source": "test"}
         )
         if memory_id:
             print(f"  [{mem_type}] {content}")
 
     # サマリーを生成
     print("\n記憶サマリーを生成中（LLM使用）...")
-    summary = await memory_consolidation.generate_memory_summary(
-        user_id=test_user,
-        days=30
-    )
+    summary = await memory_consolidation.generate_memory_summary(user_id=test_user, days=30)
 
     if summary:
-        print(f"\nサマリー内容:")
+        print("\nサマリー内容:")
         for key, value in summary.items():
             if isinstance(value, dict):
                 print(f"  {key}:")
@@ -133,7 +127,7 @@ def test_relationship_scoring():
             memory_type="emotional_state",
             importance_score=0.8,
             timestamp=now,
-            metadata={}
+            metadata={},
         ),
         MemoryItem(
             id="mem2",
@@ -142,7 +136,7 @@ def test_relationship_scoring():
             memory_type="symptoms",
             importance_score=0.9,
             timestamp=now - timedelta(hours=2),
-            metadata={}
+            metadata={},
         ),
         MemoryItem(
             id="mem3",
@@ -151,7 +145,7 @@ def test_relationship_scoring():
             memory_type="coping_methods",
             importance_score=0.6,
             timestamp=now - timedelta(days=5),
-            metadata={}
+            metadata={},
         ),
         MemoryItem(
             id="mem4",
@@ -160,8 +154,8 @@ def test_relationship_scoring():
             memory_type="coping_methods",
             importance_score=0.7,
             timestamp=now - timedelta(days=1),
-            metadata={}
-        )
+            metadata={},
+        ),
     ]
 
     # メモリに追加
@@ -176,9 +170,7 @@ def test_relationship_scoring():
     # 関連記憶を検索
     print("\n記憶1(不安が強い)に関連する記憶を検索中...")
     related = memory_relationship.find_related_memories(
-        user_id=test_user,
-        target_memory=memories[0],
-        limit=3
+        user_id=test_user, target_memory=memories[0], limit=3
     )
 
     print(f"\n関連記憶: {len(related)}件")
@@ -216,7 +208,7 @@ async def test_memory_graph():
         ("パニック発作", "symptoms", 0.9),
         ("深呼吸する", "coping_methods", 0.7),
         ("復職したい", "goals", 0.6),
-        ("薬を飲んでいる", "medication", 0.7)
+        ("薬を飲んでいる", "medication", 0.7),
     ]
 
     print("\nテスト記憶を追加中...")
@@ -225,7 +217,7 @@ async def test_memory_graph():
             user_id=test_user,
             content=content,
             memory_type=mem_type,
-            metadata={"importance_override": importance}
+            metadata={"importance_override": importance},
         )
         if memory_id:
             print(f"  [{mem_type}] {content}")
@@ -235,21 +227,21 @@ async def test_memory_graph():
     graph = await memory_relationship.generate_memory_graph(test_user)
 
     if graph:
-        print(f"\nグラフ構造:")
+        print("\nグラフ構造:")
         print(f"  ノード数: {len(graph.get('nodes', []))}個")
         print(f"  エッジ数: {len(graph.get('edges', []))}本")
 
-        print(f"\nノード一覧:")
-        for node in graph.get('nodes', [])[:5]:
+        print("\nノード一覧:")
+        for node in graph.get("nodes", [])[:5]:
             print(f"  ID={node['id'][:8]}... 重要度={node['importance']:.2f}")
             print(f"    {node['content'][:50]}")
 
-        print(f"\nエッジ一覧:")
-        for edge in graph.get('edges', [])[:5]:
+        print("\nエッジ一覧:")
+        for edge in graph.get("edges", [])[:5]:
             print(f"  {edge['source'][:8]}... → {edge['target'][:8]}...")
             print(f"    スコア={edge['score']:.2f}, 理由={edge['reason']}")
 
-        if len(graph.get('nodes', [])) > 0:
+        if len(graph.get("nodes", [])) > 0:
             print("\n  [PASS] 記憶グラフが生成されました")
             return True
         else:

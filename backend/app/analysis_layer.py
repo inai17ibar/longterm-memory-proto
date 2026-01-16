@@ -3,14 +3,16 @@
 ユーザーの内部状態を予測し、適切な応答スタイルを提案
 """
 
-import os
 import json
+import os
 import re
 from datetime import datetime
-from typing import Dict, Any, List, Optional
+from typing import Any, Optional
+
 import openai
-from .user_profile import UserProfile
+
 from .memory_system import MemoryItem
+from .user_profile import UserProfile
 
 
 class AnalysisLayer:
@@ -25,9 +27,9 @@ class AnalysisLayer:
         user_id: str,
         user_message: str,
         user_profile: Optional[UserProfile],
-        recent_conversations: List[Dict[str, Any]],
-        relevant_memories: List[MemoryItem]
-    ) -> Dict[str, Any]:
+        recent_conversations: list[dict[str, Any]],
+        relevant_memories: list[MemoryItem],
+    ) -> dict[str, Any]:
         """
         ユーザーの現在の感情・ニーズ・推奨モードをLLMで推定
 
@@ -61,21 +63,21 @@ class AnalysisLayer:
             user_message=user_message,
             history_summary=history_summary,
             relevant_summary=relevant_summary,
-            profile_summary=profile_summary
+            profile_summary=profile_summary,
         )
 
         # 文脈パターン分析を追加
         contextual_patterns = self._analyze_contextual_patterns(
             user_profile=user_profile,
             recent_conversations=recent_conversations,
-            current_state=state
+            current_state=state,
         )
 
-        state['contextual_patterns'] = contextual_patterns
+        state["contextual_patterns"] = contextual_patterns
 
         return state
 
-    def _summarize_conversations(self, conversations: List[Dict[str, Any]]) -> str:
+    def _summarize_conversations(self, conversations: list[dict[str, Any]]) -> str:
         """会話履歴を要約"""
         if not conversations:
             return "（会話履歴なし）"
@@ -87,7 +89,7 @@ class AnalysisLayer:
 
         return summary
 
-    def _summarize_memories(self, memories: List[MemoryItem]) -> str:
+    def _summarize_memories(self, memories: list[MemoryItem]) -> str:
         """関連記憶を要約"""
         if not memories:
             return "（関連記憶なし）"
@@ -121,12 +123,8 @@ class AnalysisLayer:
         return "\n".join(parts) if parts else "（プロファイル情報なし）"
 
     async def _estimate_state_with_llm(
-        self,
-        user_message: str,
-        history_summary: str,
-        relevant_summary: str,
-        profile_summary: str
-    ) -> Dict[str, Any]:
+        self, user_message: str, history_summary: str, relevant_summary: str, profile_summary: str
+    ) -> dict[str, Any]:
         """LLMで状態推定"""
         prompt = f"""
 あなたはメンタルヘルスカウンセリングの専門家です。
@@ -171,11 +169,14 @@ class AnalysisLayer:
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "あなたはメンタルヘルスの状態を分析するアシスタントです。JSONのみで返答してください。"},
-                    {"role": "user", "content": prompt}
+                    {
+                        "role": "system",
+                        "content": "あなたはメンタルヘルスの状態を分析するアシスタントです。JSONのみで返答してください。",
+                    },
+                    {"role": "user", "content": prompt},
                 ],
                 max_tokens=400,
-                temperature=0.2
+                temperature=0.2,
             )
 
             text = response.choices[0].message.content.strip()
@@ -196,7 +197,7 @@ class AnalysisLayer:
             print(f"Error in analyze_user_state: {e}")
             return self._mock_state_estimation(user_message)
 
-    def _mock_state_estimation(self, user_message: str = "") -> Dict[str, Any]:
+    def _mock_state_estimation(self, user_message: str = "") -> dict[str, Any]:
         """モック状態推定（キーワード分析ベース）"""
         # メッセージが渡されない場合は中立状態
         if not user_message:
@@ -207,72 +208,79 @@ class AnalysisLayer:
                 "main_topics": ["メンタルヘルス"],
                 "need": "共感してほしい",
                 "modes": ["empathy", "emotion_labeling"],
-                "state_comment": "現在の状態を分析中です"
+                "state_comment": "現在の状態を分析中です",
             }
 
         msg_lower = user_message.lower()
 
         # 気分の推定
         mood = 5
-        if any(word in msg_lower for word in ['嬉しい', '楽しい', '良い', '幸せ', 'いい']):
+        if any(word in msg_lower for word in ["嬉しい", "楽しい", "良い", "幸せ", "いい"]):
             mood = 8
-        elif any(word in msg_lower for word in ['最高', '素晴らしい', '完璧']):
+        elif any(word in msg_lower for word in ["最高", "素晴らしい", "完璧"]):
             mood = 9
-        elif any(word in msg_lower for word in ['辛い', '苦しい', '悲しい', '悔しい', 'つらい']):
+        elif any(word in msg_lower for word in ["辛い", "苦しい", "悲しい", "悔しい", "つらい"]):
             mood = 2
-        elif any(word in msg_lower for word in ['最悪', '何もしたくない', '無理']):
+        elif any(word in msg_lower for word in ["最悪", "何もしたくない", "無理"]):
             mood = 1
-        elif any(word in msg_lower for word in ['不安', '心配', '怖い', '怖れ']):
+        elif any(word in msg_lower for word in ["不安", "心配", "怖い", "怖れ"]):
             mood = 3
-        elif any(word in msg_lower for word in ['落ち着いた', 'リラックス']):
+        elif any(word in msg_lower for word in ["落ち着いた", "リラックス"]):
             mood = 7
 
         # エネルギーの推定
         energy = 5
-        if any(word in msg_lower for word in ['全く動けない', '何もできない', '極度の疲労']):
+        if any(word in msg_lower for word in ["全く動けない", "何もできない", "極度の疲労"]):
             energy = 1
-        elif any(word in msg_lower for word in ['疲れた', '疲れ', '眠い', '休みたい', '疲労']):
+        elif any(word in msg_lower for word in ["疲れた", "疲れ", "眠い", "休みたい", "疲労"]):
             energy = 2
-        elif any(word in msg_lower for word in ['非常に活発', '躍起', 'やる気満々']):
+        elif any(word in msg_lower for word in ["非常に活発", "躍起", "やる気満々"]):
             energy = 9
-        elif any(word in msg_lower for word in ['頑張り', 'やる気', 'モチベ', 'やる', '楽しい', '楽しかった', '嬉しい']):
+        elif any(
+            word in msg_lower
+            for word in ["頑張り", "やる気", "モチベ", "やる", "楽しい", "楽しかった", "嬉しい"]
+        ):
             energy = 8
-        elif any(word in msg_lower for word in ['元気', 'いい感じ', '調子いい']):
+        elif any(word in msg_lower for word in ["元気", "いい感じ", "調子いい"]):
             energy = 7
 
         # 不安度の推定
         anxiety = 5
-        if any(word in msg_lower for word in ['極度の不安', 'パニック発作', '襲われた']):
+        if any(word in msg_lower for word in ["極度の不安", "パニック発作", "襲われた"]):
             anxiety = 10
-        elif any(word in msg_lower for word in ['全く不安がない', '穏やかそのもの']):
+        elif any(word in msg_lower for word in ["全く不安がない", "穏やかそのもの"]):
             anxiety = 0
-        elif any(word in msg_lower for word in ['落ち着いた', 'リラックス', '穏やか', '平穏']):
+        elif any(word in msg_lower for word in ["落ち着いた", "リラックス", "穏やか", "平穏"]):
             anxiety = 2
-        elif any(word in msg_lower for word in ['不安', '心配', '怖い', 'パニック', 'ストレス', '緊張']):
+        elif any(
+            word in msg_lower for word in ["不安", "心配", "怖い", "パニック", "ストレス", "緊張"]
+        ):
             anxiety = 8
 
         # トピック抽出
         topics = []
-        if any(word in msg_lower for word in ['仕事', '職場', '勤務', '業務']):
+        if any(word in msg_lower for word in ["仕事", "職場", "勤務", "業務"]):
             topics.append("仕事・職場")
-        if any(word in msg_lower for word in ['家族', '親', '両親']):
+        if any(word in msg_lower for word in ["家族", "親", "両親"]):
             topics.append("家族関係")
-        if any(word in msg_lower for word in ['友人', '友達', '人間関係', '対人']):
+        if any(word in msg_lower for word in ["友人", "友達", "人間関係", "対人"]):
             topics.append("人間関係")
-        if any(word in msg_lower for word in ['睡眠', '眠り', '眠い', '不眠']):
+        if any(word in msg_lower for word in ["睡眠", "眠り", "眠い", "不眠"]):
             topics.append("睡眠")
-        if any(word in msg_lower for word in ['恋愛', '恋人', 'パートナー']):
+        if any(word in msg_lower for word in ["恋愛", "恋人", "パートナー"]):
             topics.append("恋愛")
         if not topics:
             topics = ["メンタルヘルス"]
 
         # ニーズ推定
         need = "共感してほしい"
-        if any(word in msg_lower for word in ['どうしたら', 'どうすれば', '対策', '対処', 'アドバイス']):
+        if any(
+            word in msg_lower for word in ["どうしたら", "どうすれば", "対策", "対処", "アドバイス"]
+        ):
             need = "解決のヒント・アドバイス"
-        if any(word in msg_lower for word in ['聞いて', '聴いて', '話したい', '吐き出したい']):
+        if any(word in msg_lower for word in ["聞いて", "聴いて", "話したい", "吐き出したい"]):
             need = "話を聞いてほしい・受け入れてもらいたい"
-        if any(word in msg_lower for word in ['整理', '整りー', '何が問題か', '気持ちの整理']):
+        if any(word in msg_lower for word in ["整理", "整りー", "何が問題か", "気持ちの整理"]):
             need = "気持ちや問題の整理"
 
         return {
@@ -282,69 +290,69 @@ class AnalysisLayer:
             "main_topics": topics,
             "need": need,
             "modes": ["empathy", "emotion_labeling"],
-            "state_comment": f"会話内容から推定した状態（気分:{mood}, エネルギー:{energy}, 不安:{anxiety}）"
+            "state_comment": f"会話内容から推定した状態（気分:{mood}, エネルギー:{energy}, 不安:{anxiety}）",
         }
 
     def _analyze_contextual_patterns(
         self,
         user_profile: Optional[UserProfile],
-        recent_conversations: List[Dict[str, Any]],
-        current_state: Dict[str, Any]
-    ) -> Dict[str, Any]:
+        recent_conversations: list[dict[str, Any]],
+        current_state: dict[str, Any],
+    ) -> dict[str, Any]:
         """文脈パターンを分析"""
         patterns = {}
 
         # 時間帯分析
         current_hour = datetime.now().hour
         if current_hour >= 22 or current_hour <= 5:
-            anxiety = current_state.get('anxiety')
+            anxiety = current_state.get("anxiety")
             if anxiety and anxiety >= 7:
-                patterns['night_mood'] = "深夜で不安が高い状態です"
+                patterns["night_mood"] = "深夜で不安が高い状態です"
 
         # 週末・平日分析
         current_weekday = datetime.now().weekday()
         if current_weekday < 5:  # 月〜金
             if user_profile and user_profile.work_status:
                 if "休職" not in user_profile.work_status:
-                    patterns['weekday_stress'] = "平日の勤務日です"
+                    patterns["weekday_stress"] = "平日の勤務日です"
 
         # トレンド分析（過去3日の会話から）
         if len(recent_conversations) >= 3:
             # 簡易的なトレンド分析
-            patterns['trend_analysis'] = f"過去{len(recent_conversations)}件の会話を分析"
+            patterns["trend_analysis"] = f"過去{len(recent_conversations)}件の会話を分析"
 
         return patterns
 
     def suggest_response_approach(
-        self,
-        user_state: Dict[str, Any],
-        user_profile: Optional[UserProfile]
-    ) -> Dict[str, Any]:
+        self, user_state: dict[str, Any], user_profile: Optional[UserProfile]
+    ) -> dict[str, Any]:
         """応答アプローチを提案"""
         suggestions = {
-            "priority_modes": user_state.get('modes', ['empathy']),
+            "priority_modes": user_state.get("modes", ["empathy"]),
             "tone": "supportive",  # supportive, gentle, informative
             "length": "medium",  # short, medium, long
-            "specific_tips": []
+            "specific_tips": [],
         }
 
         # 不安が高い場合
-        anxiety = user_state.get('anxiety')
+        anxiety = user_state.get("anxiety")
         if anxiety and anxiety >= 8:
-            suggestions['tone'] = "gentle"
-            suggestions['specific_tips'].append("不安が非常に高いため、安心感を最優先にしてください")
+            suggestions["tone"] = "gentle"
+            suggestions["specific_tips"].append(
+                "不安が非常に高いため、安心感を最優先にしてください"
+            )
 
         # エネルギーが低い場合
-        energy = user_state.get('energy')
+        energy = user_state.get("energy")
         if energy and energy <= 3:
-            suggestions['length'] = "short"
-            suggestions['specific_tips'].append("エネルギーが低いため、短く簡潔に応答してください")
+            suggestions["length"] = "short"
+            suggestions["specific_tips"].append("エネルギーが低いため、短く簡潔に応答してください")
 
         # 目標が明確な場合
         if user_profile and user_profile.goals:
-            if 'small_action' not in suggestions['priority_modes']:
-                suggestions['priority_modes'].append('small_action')
-            suggestions['specific_tips'].append("目標に向けた小さな行動を提案できます")
+            if "small_action" not in suggestions["priority_modes"]:
+                suggestions["priority_modes"].append("small_action")
+            suggestions["specific_tips"].append("目標に向けた小さな行動を提案できます")
 
         return suggestions
 

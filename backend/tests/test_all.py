@@ -1,12 +1,12 @@
 """
 全機能の統合テストスクリプト
 """
-import sys
 import asyncio
-from datetime import datetime, timedelta
+import sys
 
 # 個別のテストをインポート
 from test_importance import test_importance_calculation, test_time_decay
+
 
 async def test_basic_functionality():
     """基本機能の統合テスト"""
@@ -14,11 +14,12 @@ async def test_basic_functionality():
     print("基本機能の統合テスト")
     print("=" * 60)
 
-    from app.memory_system import memory_system
+    import time
+
     from app.episodic_memory import episodic_memory_system
+    from app.memory_system import memory_system
     from app.user_profile import user_profile_system
 
-    import time
     test_user = f"integration_test_{int(time.time())}"
 
     # 1. 記憶システムのテスト
@@ -27,7 +28,7 @@ async def test_basic_functionality():
         user_id=test_user,
         content="テストで不安を感じています",
         memory_type="emotional_state",
-        metadata={"test": True}
+        metadata={"test": True},
     )
 
     if memory_id:
@@ -45,7 +46,7 @@ async def test_basic_functionality():
         anxiety=7,
         primary_emotion="anxious",
         triggers=["テスト"],
-        notes="テスト中"
+        notes="テスト中",
     )
 
     if emotion_id:
@@ -60,7 +61,7 @@ async def test_basic_functionality():
     print(f"  取得件数: {len(emotions)}件")
 
     if len(emotions) > 0:
-        print(f"  [OK] 感情履歴が取得できました")
+        print("  [OK] 感情履歴が取得できました")
     else:
         print("  [NG] 感情履歴が空です")
         return False
@@ -80,17 +81,13 @@ async def test_basic_functionality():
     print("\n[5] 記憶の重要度計算")
     from app.memory_system import MemoryImportanceCalculator
 
-    score = MemoryImportanceCalculator.calculate_importance(
-        "パニック発作が起きた",
-        "symptoms",
-        {}
-    )
+    score = MemoryImportanceCalculator.calculate_importance("パニック発作が起きた", "symptoms", {})
     print(f"  重要度スコア: {score:.2f}")
 
     if score > 0.7:
-        print(f"  [OK] 高重要度として計算されました")
+        print("  [OK] 高重要度として計算されました")
     else:
-        print(f"  [NG] 重要度が低すぎます")
+        print("  [NG] 重要度が低すぎます")
         return False
 
     print("\n" + "=" * 60)
@@ -105,18 +102,16 @@ async def test_quality_filtering():
     print("記憶品質フィルタリングのテスト")
     print("=" * 60)
 
+    import time
+
     from app.memory_system import memory_system
 
-    import time
     test_user = f"quality_test_{int(time.time())}"
 
     # 短すぎる記憶（拒否されるべき）
     print("\n[短すぎる記憶]")
     result1 = await memory_system.store_memory(
-        user_id=test_user,
-        content="はい",
-        memory_type="concerns",
-        metadata={}
+        user_id=test_user, content="はい", memory_type="concerns", metadata={}
     )
 
     if not result1:
@@ -131,7 +126,7 @@ async def test_quality_filtering():
         user_id=test_user,
         content="今日は不安が強くて辛かったです",
         memory_type="emotional_state",
-        metadata={}
+        metadata={},
     )
 
     if result2:
@@ -146,7 +141,7 @@ async def test_quality_filtering():
         user_id=test_user,
         content="今日は不安が強くて辛かったです",
         memory_type="emotional_state",
-        metadata={}
+        metadata={},
     )
 
     if not result3:

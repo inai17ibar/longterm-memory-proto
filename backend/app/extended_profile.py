@@ -3,18 +3,20 @@
 JSONフォーマットでの入出力に対応
 """
 
+import hashlib
 import json
 import os
-from typing import Dict, Any, List, Optional
-from dataclasses import dataclass, field, asdict
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-import hashlib
+from typing import Any, Optional
+
 from app.config import EXTENDED_PROFILES_JSON_PATH
 
 
 @dataclass
 class ProfileSettings:
     """プロファイル設定"""
+
     display_name: str = "ユーザー"
     ai_name: str = "カウンセラー"
     ai_personality: str = "優しく寄り添うガイド"
@@ -28,7 +30,8 @@ class ProfileSettings:
 @dataclass
 class GeneralProfile:
     """一般的なプロファイル情報"""
-    hobbies: List[str] = field(default_factory=list)
+
+    hobbies: list[str] = field(default_factory=list)
     occupation: Optional[str] = None
     location: Optional[str] = None
     age: Optional[str] = None
@@ -38,6 +41,7 @@ class GeneralProfile:
 @dataclass
 class MentalProfile:
     """メンタルヘルス関連プロファイル"""
+
     recent_medication_change: Optional[str] = None
     current_mental_state: Optional[str] = None
     symptoms: Optional[str] = None
@@ -49,21 +53,23 @@ class MentalProfile:
 @dataclass
 class Favorites:
     """お気に入り情報"""
+
     comedian: Optional[str] = None
     favorite_food: Optional[str] = None
     favorite_animal: Optional[str] = None
     tv_drama: Optional[str] = None
-    comedians: List[str] = field(default_factory=list)
+    comedians: list[str] = field(default_factory=list)
     food: Optional[str] = None
     beverage: Optional[str] = None
     drink: Optional[str] = None
     # 動的に追加されるフィールド用
-    extra: Dict[str, Any] = field(default_factory=dict)
+    extra: dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
 class ImportantMemory:
     """重要な記憶"""
+
     text: str
     importance: str = "medium"  # low/medium/high
     timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
@@ -72,18 +78,22 @@ class ImportantMemory:
 @dataclass
 class Concern:
     """悩み・懸念事項"""
-    id: str = field(default_factory=lambda: hashlib.md5(str(datetime.now().timestamp()).encode()).hexdigest())
+
+    id: str = field(
+        default_factory=lambda: hashlib.md5(str(datetime.now().timestamp()).encode()).hexdigest()
+    )
     summary: str = ""
     details: str = ""
     category: str = "その他"
     status: str = "継続中"  # 継続中/解決済み/一時保留
     timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
-    sources: List[int] = field(default_factory=list)
+    sources: list[int] = field(default_factory=list)
 
 
 @dataclass
 class Goal:
     """目標"""
+
     goal: str
     importance: str = "medium"  # low/medium/high
     timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
@@ -94,6 +104,7 @@ class Goal:
 @dataclass
 class MoodEntry:
     """気分エントリー"""
+
     mood: str
     intensity: str = "中"  # 低/中/高
     timestamp: int = field(default_factory=lambda: int(datetime.now().timestamp()))
@@ -103,41 +114,44 @@ class MoodEntry:
 @dataclass
 class TimePattern:
     """時間パターン"""
+
     key: str
     tendency: str  # positive/negative/neutral
     description: str
-    stats: Dict[str, int] = field(default_factory=dict)
+    stats: dict[str, int] = field(default_factory=dict)
 
 
 @dataclass
 class UserTendency:
     """ユーザー傾向"""
+
     dominant_mood: str = "普通"
-    counts: Dict[str, int] = field(default_factory=dict)
+    counts: dict[str, int] = field(default_factory=dict)
     recent_intensity: str = "中"
     last_observed: int = field(default_factory=lambda: int(datetime.now().timestamp()))
     insight: str = ""
-    time_patterns: List[TimePattern] = field(default_factory=list)
-    weekday_patterns: List[TimePattern] = field(default_factory=list)
+    time_patterns: list[TimePattern] = field(default_factory=list)
+    weekday_patterns: list[TimePattern] = field(default_factory=list)
 
 
 @dataclass
 class ExtendedUserProfile:
     """拡張ユーザープロファイル"""
+
     user_id: str
     profile_settings: ProfileSettings = field(default_factory=ProfileSettings)
     general_profile: GeneralProfile = field(default_factory=GeneralProfile)
     mental_profile: MentalProfile = field(default_factory=MentalProfile)
     favorites: Favorites = field(default_factory=Favorites)
-    important_memories: List[ImportantMemory] = field(default_factory=list)
-    recent_concerns: Dict[str, List[Concern]] = field(default_factory=dict)
-    goals: List[Goal] = field(default_factory=list)
-    relationships: Dict[str, Any] = field(default_factory=dict)
-    environments: Dict[str, Any] = field(default_factory=dict)
-    mood_trend: List[MoodEntry] = field(default_factory=list)
+    important_memories: list[ImportantMemory] = field(default_factory=list)
+    recent_concerns: dict[str, list[Concern]] = field(default_factory=dict)
+    goals: list[Goal] = field(default_factory=list)
+    relationships: dict[str, Any] = field(default_factory=dict)
+    environments: dict[str, Any] = field(default_factory=dict)
+    mood_trend: list[MoodEntry] = field(default_factory=list)
     user_tendency: UserTendency = field(default_factory=UserTendency)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """辞書形式に変換"""
         result = {}
         for key, value in asdict(self).items():
@@ -154,7 +168,7 @@ class ExtendedUserProfile:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=indent)
 
     @classmethod
-    def from_dict(cls, user_id: str, data: Dict[str, Any]) -> 'ExtendedUserProfile':
+    def from_dict(cls, user_id: str, data: dict[str, Any]) -> "ExtendedUserProfile":
         """辞書からインスタンスを作成"""
         profile = cls(user_id=user_id)
 
@@ -174,14 +188,22 @@ class ExtendedUserProfile:
         if "favorites" in data:
             fav_data = data["favorites"].copy()
             # extra フィールドに未定義のキーを格納
-            known_keys = {'comedian', 'favorite_food', 'favorite_animal', 'tv_drama',
-                         'comedians', 'food', 'beverage', 'drink'}
+            known_keys = {
+                "comedian",
+                "favorite_food",
+                "favorite_animal",
+                "tv_drama",
+                "comedians",
+                "food",
+                "beverage",
+                "drink",
+            }
             # 既存のextraキーを除外して、新しいextraを作成（無限ネストを防ぐ）
             # known_keysにもextraにも含まれないキーのみを抽出
-            extra = {k: v for k, v in fav_data.items() if k not in known_keys and k != 'extra'}
-            fav_data['extra'] = extra
+            extra = {k: v for k, v in fav_data.items() if k not in known_keys and k != "extra"}
+            fav_data["extra"] = extra
             # 既知のキーのみで Favorites を作成
-            filtered_fav = {k: v for k, v in fav_data.items() if k in known_keys or k == 'extra'}
+            filtered_fav = {k: v for k, v in fav_data.items() if k in known_keys or k == "extra"}
             profile.favorites = Favorites(**filtered_fav)
 
         # important_memories
@@ -244,7 +266,7 @@ class ExtendedProfileSystem:
 
     def __init__(self, json_file_path: str = None):
         self.json_file_path = str(json_file_path or EXTENDED_PROFILES_JSON_PATH)
-        self.profiles: Dict[str, ExtendedUserProfile] = {}
+        self.profiles: dict[str, ExtendedUserProfile] = {}
         self.load_from_file()
 
     def load_from_file(self):
@@ -254,7 +276,7 @@ class ExtendedProfileSystem:
             return
 
         try:
-            with open(self.json_file_path, 'r', encoding='utf-8') as f:
+            with open(self.json_file_path, encoding="utf-8") as f:
                 data = json.load(f)
 
             if "users" in data:
@@ -268,14 +290,9 @@ class ExtendedProfileSystem:
 
     def save_to_file(self):
         """全プロファイルをJSONファイルに保存"""
-        data = {
-            "users": {
-                user_id: profile.to_dict()
-                for user_id, profile in self.profiles.items()
-            }
-        }
+        data = {"users": {user_id: profile.to_dict() for user_id, profile in self.profiles.items()}}
 
-        with open(self.json_file_path, 'w', encoding='utf-8') as f:
+        with open(self.json_file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
         print(f"Saved {len(self.profiles)} extended profiles to {self.json_file_path}")
@@ -309,58 +326,58 @@ class ExtendedProfileSystem:
             profile = ExtendedUserProfile(user_id=user_id)
 
         # GeneralProfileのマッピング
-        if hasattr(user_profile, 'name') and user_profile.name:
+        if hasattr(user_profile, "name") and user_profile.name:
             profile.profile_settings.display_name = user_profile.name
-        if hasattr(user_profile, 'job') and user_profile.job:
+        if hasattr(user_profile, "job") and user_profile.job:
             profile.general_profile.occupation = user_profile.job
-        if hasattr(user_profile, 'location') and user_profile.location:
+        if hasattr(user_profile, "location") and user_profile.location:
             profile.general_profile.location = user_profile.location
-        if hasattr(user_profile, 'age') and user_profile.age:
+        if hasattr(user_profile, "age") and user_profile.age:
             profile.general_profile.age = user_profile.age
-        if hasattr(user_profile, 'family') and user_profile.family:
+        if hasattr(user_profile, "family") and user_profile.family:
             profile.general_profile.family = user_profile.family
-        if hasattr(user_profile, 'hobbies') and user_profile.hobbies:
+        if hasattr(user_profile, "hobbies") and user_profile.hobbies:
             profile.general_profile.hobbies = user_profile.hobbies
 
         # MentalProfileのマッピング
-        if hasattr(user_profile, 'emotional_state') and user_profile.emotional_state:
+        if hasattr(user_profile, "emotional_state") and user_profile.emotional_state:
             profile.mental_profile.current_mental_state = user_profile.emotional_state
-        if hasattr(user_profile, 'medication') and user_profile.medication:
+        if hasattr(user_profile, "medication") and user_profile.medication:
             profile.mental_profile.recent_medication_change = user_profile.medication
-        if hasattr(user_profile, 'symptoms') and user_profile.symptoms:
+        if hasattr(user_profile, "symptoms") and user_profile.symptoms:
             profile.mental_profile.symptoms = user_profile.symptoms
-        if hasattr(user_profile, 'triggers') and user_profile.triggers:
+        if hasattr(user_profile, "triggers") and user_profile.triggers:
             profile.mental_profile.triggers = user_profile.triggers
-        if hasattr(user_profile, 'coping_methods') and user_profile.coping_methods:
+        if hasattr(user_profile, "coping_methods") and user_profile.coping_methods:
             profile.mental_profile.coping_methods = user_profile.coping_methods
-        if hasattr(user_profile, 'support_system') and user_profile.support_system:
+        if hasattr(user_profile, "support_system") and user_profile.support_system:
             profile.mental_profile.support_system = user_profile.support_system
 
         # Concerns（悩み）を recent_concerns に追加
-        if hasattr(user_profile, 'concerns') and user_profile.concerns:
+        if hasattr(user_profile, "concerns") and user_profile.concerns:
             if "その他" not in profile.recent_concerns:
                 profile.recent_concerns["その他"] = []
             # 既存の悩みと重複しないようにチェック
-            existing_summaries = {c.summary for cat in profile.recent_concerns.values() for c in cat}
+            existing_summaries = {
+                c.summary for cat in profile.recent_concerns.values() for c in cat
+            }
             if user_profile.concerns not in existing_summaries:
                 new_concern = Concern(
-                    summary=user_profile.concerns[:50] if len(user_profile.concerns) > 50 else user_profile.concerns,
+                    summary=user_profile.concerns[:50]
+                    if len(user_profile.concerns) > 50
+                    else user_profile.concerns,
                     details=user_profile.concerns,
                     category="その他",
-                    status="継続中"
+                    status="継続中",
                 )
                 profile.recent_concerns["その他"].append(new_concern)
 
         # Goals（目標）を goals に追加
-        if hasattr(user_profile, 'goals') and user_profile.goals:
+        if hasattr(user_profile, "goals") and user_profile.goals:
             # 既存の目標と重複しないようにチェック
             existing_goals = {g.goal for g in profile.goals}
             if user_profile.goals not in existing_goals:
-                new_goal = Goal(
-                    goal=user_profile.goals,
-                    importance="medium",
-                    status="active"
-                )
+                new_goal = Goal(goal=user_profile.goals, importance="medium", status="active")
                 profile.goals.append(new_goal)
 
         self.create_or_update_profile(profile)
@@ -376,7 +393,7 @@ class ExtendedProfileSystem:
 
         # プロファイル設定
         settings = profile.profile_settings
-        summary_parts.append(f"## プロファイル設定")
+        summary_parts.append("## プロファイル設定")
         summary_parts.append(f"- 表示名: {settings.display_name}")
         summary_parts.append(f"- AI名: {settings.ai_name}")
         summary_parts.append(f"- AI性格: {settings.ai_personality}")
@@ -384,8 +401,14 @@ class ExtendedProfileSystem:
 
         # 一般プロファイル
         general = profile.general_profile
-        if general.occupation or general.location or general.hobbies or general.age or general.family:
-            summary_parts.append(f"\n## 基本情報")
+        if (
+            general.occupation
+            or general.location
+            or general.hobbies
+            or general.age
+            or general.family
+        ):
+            summary_parts.append("\n## 基本情報")
             if general.age:
                 summary_parts.append(f"- 年齢: {general.age}")
             if general.occupation:
@@ -399,9 +422,15 @@ class ExtendedProfileSystem:
 
         # メンタルプロファイル
         mental = profile.mental_profile
-        if (mental.current_mental_state or mental.recent_medication_change or
-            mental.symptoms or mental.triggers or mental.coping_methods or mental.support_system):
-            summary_parts.append(f"\n## メンタルヘルス状況")
+        if (
+            mental.current_mental_state
+            or mental.recent_medication_change
+            or mental.symptoms
+            or mental.triggers
+            or mental.coping_methods
+            or mental.support_system
+        ):
+            summary_parts.append("\n## メンタルヘルス状況")
             if mental.current_mental_state:
                 summary_parts.append(f"- 現在の状態: {mental.current_mental_state}")
             if mental.recent_medication_change:
@@ -429,19 +458,19 @@ class ExtendedProfileSystem:
         if fav.comedian:
             fav_items.append(f"芸人: {fav.comedian}")
         if fav_items:
-            summary_parts.append(f"\n## お気に入り")
+            summary_parts.append("\n## お気に入り")
             for item in fav_items:
                 summary_parts.append(f"- {item}")
 
         # 重要な記憶
         if profile.important_memories:
-            summary_parts.append(f"\n## 重要な記憶")
+            summary_parts.append("\n## 重要な記憶")
             for mem in profile.important_memories[-5:]:  # 最新5件
                 summary_parts.append(f"- [{mem.importance}] {mem.text}")
 
         # 現在の悩み
         if profile.recent_concerns:
-            summary_parts.append(f"\n## 現在の悩み・懸念")
+            summary_parts.append("\n## 現在の悩み・懸念")
             for category, concerns in profile.recent_concerns.items():
                 active_concerns = [c for c in concerns if c.status == "継続中"]
                 if active_concerns:
@@ -451,7 +480,7 @@ class ExtendedProfileSystem:
 
         # 目標
         if profile.goals:
-            summary_parts.append(f"\n## 目標")
+            summary_parts.append("\n## 目標")
             active_goals = [g for g in profile.goals if g.status == "active"]
             for goal in active_goals[-5:]:  # 最新5件
                 summary_parts.append(f"- [{goal.importance}] {goal.goal}")
@@ -459,7 +488,7 @@ class ExtendedProfileSystem:
         # 気分傾向
         tendency = profile.user_tendency
         if tendency.insight:
-            summary_parts.append(f"\n## 気分傾向")
+            summary_parts.append("\n## 気分傾向")
             summary_parts.append(f"- {tendency.insight}")
             summary_parts.append(f"- 最近の主な気分: {tendency.dominant_mood}")
 

@@ -1,9 +1,11 @@
 """
 記憶品質フィルタリングのテストスクリプト
 """
-import sys
 import asyncio
+import sys
+
 from app.memory_system import memory_system
+
 
 async def test_quality_filtering():
     """記憶品質フィルタリングのテスト"""
@@ -18,38 +20,38 @@ async def test_quality_filtering():
             "content": "こんにちは",
             "memory_type": "emotional_state",
             "should_reject": True,
-            "reason": "短すぎる"
+            "reason": "短すぎる",
         },
         {
             "content": "はい",
             "memory_type": "concerns",
             "should_reject": True,
-            "reason": "一般的すぎる表現"
+            "reason": "一般的すぎる表現",
         },
         {
             "content": "今日は不安が強くて辛かったです",
             "memory_type": "emotional_state",
             "should_reject": False,
-            "reason": "有効な記憶"
+            "reason": "有効な記憶",
         },
         {
             "content": "散歩が好きです",
             "memory_type": "coping_methods",
             "should_reject": False,
-            "reason": "有効な記憶"
+            "reason": "有効な記憶",
         },
         {
             "content": "散歩が好きです",  # 重複
             "memory_type": "coping_methods",
             "should_reject": True,
-            "reason": "重複（2回目）"
+            "reason": "重複（2回目）",
         },
         {
             "content": "散歩が好き",  # 類似
             "memory_type": "coping_methods",
             "should_reject": True,
-            "reason": "類似重複"
-        }
+            "reason": "類似重複",
+        },
     ]
 
     passed = 0
@@ -61,10 +63,10 @@ async def test_quality_filtering():
             user_id=test_user,
             content=test["content"],
             memory_type=test["memory_type"],
-            metadata={"test": True}
+            metadata={"test": True},
         )
 
-        was_rejected = (memory_id == "" or memory_id is None)
+        was_rejected = memory_id == "" or memory_id is None
 
         if was_rejected == test["should_reject"]:
             status = "PASS"
@@ -102,20 +104,20 @@ async def test_importance_threshold():
             "content": "パニック発作が起きて苦しかった",
             "memory_type": "symptoms",
             "should_store": True,
-            "expected_importance": "高い (>0.7)"
+            "expected_importance": "高い (>0.7)",
         },
         {
             "content": "不安で眠れない",
             "memory_type": "emotional_state",
             "should_store": True,
-            "expected_importance": "中程度 (0.4-0.7)"
+            "expected_importance": "中程度 (0.4-0.7)",
         },
         {
             "content": "散歩した",
             "memory_type": "daily_routine",
             "should_store": True,  # 短いが意味はあるので保存される可能性
-            "expected_importance": "低い (0.2-0.4)"
-        }
+            "expected_importance": "低い (0.2-0.4)",
+        },
     ]
 
     print("\n重要度による保存テスト:")
@@ -126,7 +128,7 @@ async def test_importance_threshold():
             user_id=test_user,
             content=test["content"],
             memory_type=test["memory_type"],
-            metadata={"test": True}
+            metadata={"test": True},
         )
 
         was_stored = bool(memory_id)
@@ -162,10 +164,7 @@ async def test_similarity_detection():
     # 元の記憶
     original = "不安で夜眠れないことが多いです"
     await memory_system.store_memory(
-        user_id=test_user,
-        content=original,
-        memory_type="symptoms",
-        metadata={"test": True}
+        user_id=test_user, content=original, memory_type="symptoms", metadata={"test": True}
     )
     print(f"\n元の記憶: '{original}'")
 
@@ -174,23 +173,23 @@ async def test_similarity_detection():
         {
             "content": "不安で夜眠れないことが多いです",  # 完全一致
             "should_reject": True,
-            "label": "完全一致"
+            "label": "完全一致",
         },
         {
             "content": "不安で夜に眠れないことが多い",  # 90%以上類似
             "should_reject": True,
-            "label": "90%以上類似"
+            "label": "90%以上類似",
         },
         {
             "content": "不安があります",  # 部分的に類似
             "should_reject": False,
-            "label": "部分的類似（保存可）"
+            "label": "部分的類似（保存可）",
         },
         {
             "content": "朝は元気です",  # 全く異なる
             "should_reject": False,
-            "label": "異なる内容（保存可）"
-        }
+            "label": "異なる内容（保存可）",
+        },
     ]
 
     passed = 0
@@ -202,7 +201,7 @@ async def test_similarity_detection():
             user_id=test_user,
             content=test["content"],
             memory_type="symptoms",
-            metadata={"test": True}
+            metadata={"test": True},
         )
 
         was_rejected = not bool(memory_id)

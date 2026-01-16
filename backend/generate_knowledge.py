@@ -2,13 +2,14 @@
 メンタルヘルスの基本知識をLLMで生成して知識ベースに登録するスクリプト
 """
 
-import os
 import json
-import asyncio
+import os
 from datetime import datetime
-from dotenv import load_dotenv
+
 import openai
-from app.knowledge_base import knowledge_base, KnowledgeItem
+from dotenv import load_dotenv
+
+from app.knowledge_base import KnowledgeItem, knowledge_base
 
 load_dotenv()
 
@@ -57,8 +58,9 @@ KNOWLEDGE_TOPICS = {
         "自傷行為の代替スキル",
         "危機時の安全計画",
         "緊急連絡先リスト",
-    ]
+    ],
 }
+
 
 def generate_knowledge_item(category: str, topic: str) -> KnowledgeItem:
     """LLMを使って特定のトピックの知識を生成"""
@@ -87,11 +89,14 @@ def generate_knowledge_item(category: str, topic: str) -> KnowledgeItem:
         response = client.chat.completions.create(
             model="gpt-4o",
             messages=[
-                {"role": "system", "content": "あなたはメンタルヘルスの専門家で、実践的な知識を提供します。"},
-                {"role": "user", "content": prompt}
+                {
+                    "role": "system",
+                    "content": "あなたはメンタルヘルスの専門家で、実践的な知識を提供します。",
+                },
+                {"role": "user", "content": prompt},
             ],
             max_tokens=800,
-            temperature=0.7
+            temperature=0.7,
         )
 
         text = response.choices[0].message.content.strip()
@@ -113,12 +118,13 @@ def generate_knowledge_item(category: str, topic: str) -> KnowledgeItem:
             content=data["content"],
             tags=data["tags"],
             relevance_keywords=data["relevance_keywords"],
-            created_at=datetime.now().isoformat()
+            created_at=datetime.now().isoformat(),
         )
 
     except Exception as e:
         print(f"Error generating knowledge for {topic}: {e}")
         return None
+
 
 def main():
     """知識ベースを生成"""
@@ -146,11 +152,12 @@ def main():
 
     # 統計表示
     stats = knowledge_base.get_stats()
-    print(f"\n統計:")
+    print("\n統計:")
     print(f"  総件数: {stats['total_items']}")
-    print(f"  カテゴリ別:")
-    for cat, count in stats['by_category'].items():
+    print("  カテゴリ別:")
+    for cat, count in stats["by_category"].items():
         print(f"    - {cat}: {count}件")
+
 
 if __name__ == "__main__":
     main()

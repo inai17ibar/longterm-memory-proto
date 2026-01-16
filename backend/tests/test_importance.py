@@ -3,7 +3,9 @@
 """
 import sys
 from datetime import datetime, timedelta
-from app.memory_system import MemoryItem, MemoryImportanceCalculator
+
+from app.memory_system import MemoryImportanceCalculator, MemoryItem
+
 
 def test_importance_calculation():
     """重要度計算のテスト"""
@@ -16,26 +18,26 @@ def test_importance_calculation():
             "content": "不安で苦しい、もう限界です",
             "memory_type": "emotional_state",
             "expected_range": (0.8, 1.0),
-            "description": "高い感情強度 + 重要なタイプ"
+            "description": "高い感情強度 + 重要なタイプ",
         },
         {
             "content": "少し心配です",
             "memory_type": "concerns",
             "expected_range": (0.5, 0.8),
-            "description": "中程度の感情強度"
+            "description": "中程度の感情強度",
         },
         {
             "content": "散歩が好きです",
             "memory_type": "personality",
             "expected_range": (0.2, 0.6),
-            "description": "低い感情強度 + 低優先度タイプ"
+            "description": "低い感情強度 + 低優先度タイプ",
         },
         {
             "content": "パニック発作が起きた",
             "memory_type": "symptoms",
             "expected_range": (0.8, 1.0),
-            "description": "症状タイプ + 高感情強度"
-        }
+            "description": "症状タイプ + 高感情強度",
+        },
     ]
 
     passed = 0
@@ -43,9 +45,7 @@ def test_importance_calculation():
 
     for idx, test in enumerate(test_cases, 1):
         score = MemoryImportanceCalculator.calculate_importance(
-            test["content"],
-            test["memory_type"],
-            {"timestamp": datetime.now().isoformat()}
+            test["content"], test["memory_type"], {"timestamp": datetime.now().isoformat()}
         )
 
         min_expected, max_expected = test["expected_range"]
@@ -100,7 +100,7 @@ def test_time_decay():
             memory_type="emotional_state",
             importance_score=base_score,
             timestamp=timestamp,
-            metadata={}
+            metadata={},
         )
 
         current_importance = memory.get_current_importance()
@@ -137,8 +137,8 @@ def test_persistent_types():
     base_score = 0.8
     days_ago = 365  # 1年前
 
-    persistent_types = ['symptoms', 'goals', 'medication', 'personality', 'work_status']
-    non_persistent_types = ['emotional_state', 'concerns']
+    persistent_types = ["symptoms", "goals", "medication", "personality", "work_status"]
+    non_persistent_types = ["emotional_state", "concerns"]
 
     print("\n[減衰しにくいタイプ]")
     for memory_type in persistent_types:
@@ -150,7 +150,7 @@ def test_persistent_types():
             memory_type=memory_type,
             importance_score=base_score,
             timestamp=timestamp,
-            metadata={}
+            metadata={},
         )
         current = memory.get_current_importance()
         print(f"  {memory_type}: {base_score:.2f} → {current:.2f} (最低70%維持)")
@@ -165,7 +165,7 @@ def test_persistent_types():
             memory_type=memory_type,
             importance_score=base_score,
             timestamp=timestamp,
-            metadata={}
+            metadata={},
         )
         current = memory.get_current_importance()
         print(f"  {memory_type}: {base_score:.2f} → {current:.2f}")

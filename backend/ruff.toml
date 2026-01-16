@@ -1,0 +1,37 @@
+# Ruff configuration for Python backend
+
+# 基本設定
+line-length = 100
+target-version = "py311"
+
+[lint]
+# 有効にするルール
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "N",   # pep8-naming
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "C4",  # flake8-comprehensions
+    "SIM", # flake8-simplify
+]
+
+# 無視するルール
+ignore = [
+    "E501",  # line-too-long (black が処理するため)
+    "B008",  # function-call-in-default-argument (FastAPIで使用)
+    "B904",  # raise-without-from-inside-except
+]
+
+# ファイルごとの設定
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]  # unused-import
+"tests/*.py" = ["B011"]    # assert-false
+
+[format]
+# フォーマット設定
+quote-style = "double"
+indent-style = "space"
+line-ending = "auto"

@@ -2,40 +2,42 @@
 LangChainベースの高度な記憶システム
 """
 
-import os
 import json
-import asyncio
+import os
 import sqlite3
-from datetime import datetime, timedelta
-from typing import List, Dict, Any, Optional, Tuple
-from dataclasses import dataclass, asdict
-import numpy as np
+from dataclasses import dataclass
+from datetime import datetime
+from typing import Any, Optional
+
 from app.config import MEMORIES_DB_PATH
 
 try:
     # LangChain imports (graceful fallback if not installed)
-    from langchain.vectorstores import Chroma
     from langchain.embeddings import OpenAIEmbeddings
-    from langchain.schema import Document
-    from langchain.memory import ConversationSummaryBufferMemory
     from langchain.llms import OpenAI
+    from langchain.memory import ConversationSummaryBufferMemory
+    from langchain.schema import Document
     from langchain.text_splitter import RecursiveCharacterTextSplitter
+    from langchain.vectorstores import Chroma
+
     LANGCHAIN_AVAILABLE = True
 except ImportError:
     LANGCHAIN_AVAILABLE = False
     print("LangChain not available, using fallback memory system")
 
+
 @dataclass
 class MemoryItem:
     """記憶アイテムの構造化されたデータクラス"""
+
     id: str
     user_id: str
     content: str
     memory_type: str  # emotional_state, goals, symptoms, etc.
     importance_score: float  # 0.0 - 1.0（保存時の基本重要度）
     timestamp: datetime
-    metadata: Dict[str, Any]
-    embedding_vector: Optional[List[float]] = None
+    metadata: dict[str, Any]
+    embedding_vector: Optional[list[float]] = None
 
     def get_current_importance(self) -> float:
         """時間減衰を考慮した現在の重要度を取得"""
@@ -56,43 +58,46 @@ class MemoryItem:
             decay_factor = 0.25  # 3ヶ月以上: 75%減衰
 
         # 一部の記憶タイプは減衰しにくい（慢性的な症状や目標など）
-        persistent_types = ['symptoms', 'goals', 'medication', 'personality', 'work_status']
+        persistent_types = ["symptoms", "goals", "medication", "personality", "work_status"]
         if self.memory_type in persistent_types:
             decay_factor = max(decay_factor, 0.7)  # 最低でも70%は維持
 
         return self.importance_score * decay_factor
 
+
 class MemoryImportanceCalculator:
     """記憶の重要度を計算するクラス"""
-    
+
     # 記憶タイプ別の基本重要度
     TYPE_IMPORTANCE_WEIGHTS = {
-        'emotional_state': 0.9,
-        'symptoms': 0.8,
-        'goals': 0.7,
-        'triggers': 0.8,
-        'coping_methods': 0.6,
-        'support_system': 0.5,
-        'work_status': 0.7,
-        'medication': 0.8,
-        'concerns': 0.9,
-        'experiences': 0.6,
-        'personality': 0.4,
-        'daily_routine': 0.3,
-        'family': 0.4,
-        'age': 0.2,
-        'location': 0.1
+        "emotional_state": 0.9,
+        "symptoms": 0.8,
+        "goals": 0.7,
+        "triggers": 0.8,
+        "coping_methods": 0.6,
+        "support_system": 0.5,
+        "work_status": 0.7,
+        "medication": 0.8,
+        "concerns": 0.9,
+        "experiences": 0.6,
+        "personality": 0.4,
+        "daily_routine": 0.3,
+        "family": 0.4,
+        "age": 0.2,
+        "location": 0.1,
     }
-    
+
     # 感情に関連するキーワードの重要度
     EMOTIONAL_KEYWORDS = {
-        'high': ['不安', '苦しい', '辛い', '死にたい', '絶望', 'パニック', '発作', '限界'],
-        'medium': ['心配', '悩み', '困った', '疲れた', 'ストレス', '落ち込み', '憂鬱'],
-        'low': ['気になる', '少し', 'ちょっと', '時々']
+        "high": ["不安", "苦しい", "辛い", "死にたい", "絶望", "パニック", "発作", "限界"],
+        "medium": ["心配", "悩み", "困った", "疲れた", "ストレス", "落ち込み", "憂鬱"],
+        "low": ["気になる", "少し", "ちょっと", "時々"],
     }
-    
+
     @classmethod
-    def calculate_importance(cls, content: str, memory_type: str, metadata: Dict[str, Any] = None) -> float:
+    def calculate_importance(
+        cls, content: str, memory_type: str, metadata: dict[str, Any] = None
+    ) -> float:
         """記憶の重要度を計算"""
         if metadata is None:
             metadata = {}
@@ -104,7 +109,7 @@ class MemoryImportanceCalculator:
         emotional_score = cls._calculate_emotional_importance(content)
 
         # 時間的な重要度（新しいほど重要）
-        temporal_score = cls._calculate_temporal_importance(metadata.get('timestamp'))
+        temporal_score = cls._calculate_temporal_importance(metadata.get("timestamp"))
 
         # 文章の長さによる重要度
         length_score = cls._calculate_length_importance(content)
@@ -136,15 +141,15 @@ class MemoryImportanceCalculator:
         final_score = base_score * multiplier
 
         return min(max(final_score, 0.1), 1.0)
-    
+
     @classmethod
     def _calculate_emotional_importance(cls, content: str) -> float:
         """感情的な重要度を計算"""
         content_lower = content.lower()
 
-        high_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS['high'] if word in content_lower)
-        medium_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS['medium'] if word in content_lower)
-        low_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS['low'] if word in content_lower)
+        high_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS["high"] if word in content_lower)
+        medium_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS["medium"] if word in content_lower)
+        low_count = sum(1 for word in cls.EMOTIONAL_KEYWORDS["low"] if word in content_lower)
 
         # 弱める表現があれば、感情強度を下げる
         if low_count > 0:
@@ -161,17 +166,17 @@ class MemoryImportanceCalculator:
             return 0.6
         else:
             return 0.5
-    
+
     @classmethod
     def _calculate_temporal_importance(cls, timestamp_str: Optional[str]) -> float:
         """時間的な重要度を計算（新しいほど重要）"""
         if not timestamp_str:
             return 0.5
-        
+
         try:
-            timestamp = datetime.fromisoformat(timestamp_str.replace('Z', '+00:00'))
+            timestamp = datetime.fromisoformat(timestamp_str.replace("Z", "+00:00"))
             days_ago = (datetime.now() - timestamp).days
-            
+
             # 1日以内は最高重要度、30日で半減
             if days_ago <= 1:
                 return 1.0
@@ -183,7 +188,7 @@ class MemoryImportanceCalculator:
                 return 0.3
         except:
             return 0.5
-    
+
     @classmethod
     def _calculate_length_importance(cls, content: str) -> float:
         """文章の長さによる重要度"""
@@ -197,6 +202,7 @@ class MemoryImportanceCalculator:
         else:
             return 0.2
 
+
 class LangChainMemorySystem:
     """LangChainベースの高度な記憶システム（SQLite永続化対応）"""
 
@@ -205,7 +211,7 @@ class LangChainMemorySystem:
         self.vector_store = None
         self.embeddings = None
         self.llm = None
-        self.memory_items: Dict[str, List[MemoryItem]] = {}
+        self.memory_items: dict[str, list[MemoryItem]] = {}
         self.db_path = str(db_path or MEMORIES_DB_PATH)
 
         # SQLiteデータベースを初期化
@@ -218,13 +224,14 @@ class LangChainMemorySystem:
             self._initialize_langchain()
         else:
             print("Using fallback memory system")
-    
+
     def _initialize_database(self):
         """SQLiteデータベースを初期化"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS memories (
                 id TEXT PRIMARY KEY,
                 user_id TEXT NOT NULL,
@@ -234,12 +241,13 @@ class LangChainMemorySystem:
                 timestamp TEXT NOT NULL,
                 metadata TEXT NOT NULL
             )
-        ''')
+        """
+        )
 
         # インデックスを作成してパフォーマンス向上
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON memories(user_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_memory_type ON memories(memory_type)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_timestamp ON memories(timestamp)')
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_id ON memories(user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_memory_type ON memories(memory_type)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_timestamp ON memories(timestamp)")
 
         conn.commit()
         conn.close()
@@ -250,11 +258,21 @@ class LangChainMemorySystem:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('SELECT id, user_id, content, memory_type, importance_score, timestamp, metadata FROM memories')
+        cursor.execute(
+            "SELECT id, user_id, content, memory_type, importance_score, timestamp, metadata FROM memories"
+        )
         rows = cursor.fetchall()
 
         for row in rows:
-            memory_id, user_id, content, memory_type, importance_score, timestamp_str, metadata_str = row
+            (
+                memory_id,
+                user_id,
+                content,
+                memory_type,
+                importance_score,
+                timestamp_str,
+                metadata_str,
+            ) = row
 
             memory_item = MemoryItem(
                 id=memory_id,
@@ -263,7 +281,7 @@ class LangChainMemorySystem:
                 memory_type=memory_type,
                 importance_score=importance_score,
                 timestamp=datetime.fromisoformat(timestamp_str),
-                metadata=json.loads(metadata_str)
+                metadata=json.loads(metadata_str),
             )
 
             if user_id not in self.memory_items:
@@ -278,18 +296,21 @@ class LangChainMemorySystem:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO memories (id, user_id, content, memory_type, importance_score, timestamp, metadata)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            memory.id,
-            memory.user_id,
-            memory.content,
-            memory.memory_type,
-            memory.importance_score,
-            memory.timestamp.isoformat(),
-            json.dumps(memory.metadata, ensure_ascii=False)
-        ))
+        """,
+            (
+                memory.id,
+                memory.user_id,
+                memory.content,
+                memory.memory_type,
+                memory.importance_score,
+                memory.timestamp.isoformat(),
+                json.dumps(memory.metadata, ensure_ascii=False),
+            ),
+        )
 
         conn.commit()
         conn.close()
@@ -304,14 +325,14 @@ class LangChainMemorySystem:
             self.vector_store = Chroma(
                 collection_name="user_memories",
                 embedding_function=self.embeddings,
-                persist_directory="./chroma_db"
+                persist_directory="./chroma_db",
             )
             print("LangChain memory system initialized successfully")
         except Exception as e:
             print(f"Failed to initialize LangChain: {e}")
             LANGCHAIN_AVAILABLE = False
-    
-    def _is_quality_memory(self, content: str, memory_type: str, user_id: str) -> Tuple[bool, str]:
+
+    def _is_quality_memory(self, content: str, memory_type: str, user_id: str) -> tuple[bool, str]:
         """
         記憶の品質をチェック
         Returns: (is_valid, reason)
@@ -333,13 +354,15 @@ class LangChainMemorySystem:
                     return False, "完全重複"
 
                 # 高い類似度（90%以上同じ）
-                if (existing_memory.memory_type == memory_type and
-                    len(content) > 20 and
-                    self._similarity_ratio(existing_memory.content, content) > 0.9):
+                if (
+                    existing_memory.memory_type == memory_type
+                    and len(content) > 20
+                    and self._similarity_ratio(existing_memory.content, content) > 0.9
+                ):
                     return False, "類似重複（90%以上）"
 
         # 情報量チェック（あまりに一般的すぎる表現を除外）
-        generic_patterns = ['はい', 'いいえ', 'そうです', 'ありがとう', 'よろしく']
+        generic_patterns = ["はい", "いいえ", "そうです", "ありがとう", "よろしく"]
         if content.strip() in generic_patterns:
             return False, "一般的すぎる表現"
 
@@ -373,8 +396,9 @@ class LangChainMemorySystem:
 
         return intersection / union if union > 0 else 0.0
 
-    async def store_memory(self, user_id: str, content: str, memory_type: str,
-                          metadata: Dict[str, Any] = None) -> str:
+    async def store_memory(
+        self, user_id: str, content: str, memory_type: str, metadata: dict[str, Any] = None
+    ) -> str:
         """記憶を保存（SQLiteに永続化）with品質フィルタリング"""
         if metadata is None:
             metadata = {}
@@ -405,7 +429,7 @@ class LangChainMemorySystem:
             memory_type=memory_type,
             importance_score=importance_score,
             timestamp=datetime.now(),
-            metadata=metadata
+            metadata=metadata,
         )
 
         # ユーザーの記憶リストに追加
@@ -413,7 +437,9 @@ class LangChainMemorySystem:
             self.memory_items[user_id] = []
         self.memory_items[user_id].append(memory_item)
 
-        print(f"Memory stored: [{memory_type}] importance={importance_score:.2f} - '{content[:50]}'...")
+        print(
+            f"Memory stored: [{memory_type}] importance={importance_score:.2f} - '{content[:50]}'..."
+        )
 
         # SQLiteに保存（永続化）
         self._save_memory_to_db(memory_item)
@@ -429,8 +455,8 @@ class LangChainMemorySystem:
                         "importance_score": importance_score,
                         "timestamp": memory_item.timestamp.isoformat(),
                         "memory_id": memory_id,
-                        **metadata
-                    }
+                        **metadata,
+                    },
                 )
                 self.vector_store.add_documents([document])
             except Exception as e:
@@ -440,19 +466,18 @@ class LangChainMemorySystem:
         await self._manage_memory_limit(user_id)
 
         return memory_id
-    
-    async def retrieve_relevant_memories(self, user_id: str, query: str, 
-                                       limit: int = 10) -> List[MemoryItem]:
+
+    async def retrieve_relevant_memories(
+        self, user_id: str, query: str, limit: int = 10
+    ) -> list[MemoryItem]:
         """関連する記憶を検索"""
         if LANGCHAIN_AVAILABLE and self.vector_store:
             try:
                 # ベクトル検索
                 docs = self.vector_store.similarity_search(
-                    query,
-                    k=limit,
-                    filter={"user_id": user_id}
+                    query, k=limit, filter={"user_id": user_id}
                 )
-                
+
                 # MemoryItemに変換
                 memories = []
                 for doc in docs:
@@ -463,47 +488,49 @@ class LangChainMemorySystem:
                         content=doc.page_content,
                         memory_type=metadata.get("memory_type", ""),
                         importance_score=metadata.get("importance_score", 0.5),
-                        timestamp=datetime.fromisoformat(metadata.get("timestamp", datetime.now().isoformat())),
-                        metadata=metadata
+                        timestamp=datetime.fromisoformat(
+                            metadata.get("timestamp", datetime.now().isoformat())
+                        ),
+                        metadata=metadata,
                     )
                     memories.append(memory_item)
-                
+
                 return memories
             except Exception as e:
                 print(f"Vector search failed: {e}")
-        
+
         # フォールバック：キーワード検索
         return self._fallback_memory_search(user_id, query, limit)
-    
-    def _fallback_memory_search(self, user_id: str, query: str, limit: int) -> List[MemoryItem]:
+
+    def _fallback_memory_search(self, user_id: str, query: str, limit: int) -> list[MemoryItem]:
         """フォールバック記憶検索（キーワードベース）"""
         if user_id not in self.memory_items:
             return []
-        
+
         query_lower = query.lower()
         scored_memories = []
-        
+
         for memory in self.memory_items[user_id]:
             # 簡単なスコアリング
             content_lower = memory.content.lower()
             score = 0.0
-            
+
             # キーワードマッチング
             query_words = query_lower.split()
             for word in query_words:
                 if word in content_lower:
                     score += 1.0
-            
+
             # 重要度スコアを加味
             score *= memory.importance_score
-            
+
             if score > 0:
                 scored_memories.append((score, memory))
-        
+
         # スコア順でソート
         scored_memories.sort(key=lambda x: x[0], reverse=True)
         return [memory for _, memory in scored_memories[:limit]]
-    
+
     async def _manage_memory_limit(self, user_id: str, max_memories: int = 200):
         """記憶の制限管理（SQLiteからも削除）"""
         if user_id not in self.memory_items:
@@ -524,7 +551,7 @@ class LangChainMemorySystem:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
         for memory in removed_memories:
-            cursor.execute('DELETE FROM memories WHERE id = ?', (memory.id,))
+            cursor.execute("DELETE FROM memories WHERE id = ?", (memory.id,))
         conn.commit()
         conn.close()
 
@@ -536,26 +563,26 @@ class LangChainMemorySystem:
                     pass
             except Exception as e:
                 print(f"Failed to remove from vector store: {e}")
-    
+
     async def summarize_memories(self, user_id: str, memory_type: Optional[str] = None) -> str:
         """記憶を要約"""
         if user_id not in self.memory_items:
             return "記憶がありません。"
-        
+
         memories = self.memory_items[user_id]
         if memory_type:
             memories = [m for m in memories if m.memory_type == memory_type]
-        
+
         if not memories:
             return "該当する記憶がありません。"
-        
+
         # 重要度でソート
         memories.sort(key=lambda m: m.importance_score, reverse=True)
-        
+
         # 上位の記憶を要約
         top_memories = memories[:20]
         content_list = [m.content for m in top_memories]
-        
+
         if LANGCHAIN_AVAILABLE and self.llm:
             try:
                 # LangChainで要約
@@ -570,34 +597,35 @@ class LangChainMemorySystem:
                 return summary.strip()
             except Exception as e:
                 print(f"Summarization failed: {e}")
-        
+
         # フォールバック要約
         return f"記録された内容：{len(content_list)}件の記憶があります。主な内容：{content_list[0][:100]}..."
-    
-    def get_memory_stats(self, user_id: str) -> Dict[str, Any]:
+
+    def get_memory_stats(self, user_id: str) -> dict[str, Any]:
         """記憶の統計情報を取得"""
         if user_id not in self.memory_items:
             return {"total_memories": 0, "by_type": {}, "avg_importance": 0.0}
-        
+
         memories = self.memory_items[user_id]
-        
+
         by_type = {}
         total_importance = 0.0
-        
+
         for memory in memories:
             if memory.memory_type not in by_type:
                 by_type[memory.memory_type] = 0
             by_type[memory.memory_type] += 1
             total_importance += memory.importance_score
-        
+
         avg_importance = total_importance / len(memories) if memories else 0.0
-        
+
         return {
             "total_memories": len(memories),
             "by_type": by_type,
             "avg_importance": avg_importance,
-            "langchain_enabled": LANGCHAIN_AVAILABLE
+            "langchain_enabled": LANGCHAIN_AVAILABLE,
         }
+
 
 # グローバルインスタンス
 memory_system = LangChainMemorySystem()

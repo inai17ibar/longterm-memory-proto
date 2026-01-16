@@ -2,25 +2,29 @@
 メンタルヘルスRAG用の知識ベースシステム
 """
 
-import os
 import json
+import os
 import sqlite3
-from typing import List, Dict, Any, Optional
-from datetime import datetime
 from dataclasses import dataclass
+from typing import Any, Optional
+
 import openai
+
 from app.config import KNOWLEDGE_BASE_DB_PATH
+
 
 @dataclass
 class KnowledgeItem:
     """知識アイテムの構造"""
+
     id: str
     category: str  # cbt_technique, symptom_management, coping_strategy, etc.
     title: str
     content: str
-    tags: List[str]
-    relevance_keywords: List[str]
+    tags: list[str]
+    relevance_keywords: list[str]
     created_at: str
+
 
 class KnowledgeBaseSystem:
     """RAG用の知識ベース管理システム"""
@@ -36,7 +40,8 @@ class KnowledgeBaseSystem:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS knowledge_items (
                 id TEXT PRIMARY KEY,
                 category TEXT NOT NULL,
@@ -46,11 +51,12 @@ class KnowledgeBaseSystem:
                 relevance_keywords TEXT NOT NULL,
                 created_at TEXT NOT NULL
             )
-        ''')
+        """
+        )
 
         # インデックス作成
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_category ON knowledge_items(category)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_tags ON knowledge_items(tags)')
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_category ON knowledge_items(category)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_tags ON knowledge_items(tags)")
 
         conn.commit()
         conn.close()
@@ -61,23 +67,28 @@ class KnowledgeBaseSystem:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO knowledge_items (id, category, title, content, tags, relevance_keywords, created_at)
             VALUES (?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            item.id,
-            item.category,
-            item.title,
-            item.content,
-            json.dumps(item.tags, ensure_ascii=False),
-            json.dumps(item.relevance_keywords, ensure_ascii=False),
-            item.created_at
-        ))
+        """,
+            (
+                item.id,
+                item.category,
+                item.title,
+                item.content,
+                json.dumps(item.tags, ensure_ascii=False),
+                json.dumps(item.relevance_keywords, ensure_ascii=False),
+                item.created_at,
+            ),
+        )
 
         conn.commit()
         conn.close()
 
-    def search_knowledge(self, query: str, category: Optional[str] = None, limit: int = 5) -> List[KnowledgeItem]:
+    def search_knowledge(
+        self, query: str, category: Optional[str] = None, limit: int = 5
+    ) -> list[KnowledgeItem]:
         """知識を検索（キーワードベース）"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
@@ -86,12 +97,36 @@ class KnowledgeBaseSystem:
 
         # 日本語の一般的なキーワードを抽出（簡易形態素解析の代替）
         japanese_keywords = [
-            '不安', '心配', '悩み', '困', '辛', '苦し', '疲れ', 'ストレス',
-            '眠れ', '不眠', '睡眠', '寝', '起き',
-            'パニック', '発作', 'うつ', '落ち込', '憂鬱',
-            '呼吸', 'リラックス', '落ち着', '対処', '方法',
-            '認知', '思考', 'マインドフルネス', '瞑想',
-            '危機', '自殺', '自傷'
+            "不安",
+            "心配",
+            "悩み",
+            "困",
+            "辛",
+            "苦し",
+            "疲れ",
+            "ストレス",
+            "眠れ",
+            "不眠",
+            "睡眠",
+            "寝",
+            "起き",
+            "パニック",
+            "発作",
+            "うつ",
+            "落ち込",
+            "憂鬱",
+            "呼吸",
+            "リラックス",
+            "落ち着",
+            "対処",
+            "方法",
+            "認知",
+            "思考",
+            "マインドフルネス",
+            "瞑想",
+            "危機",
+            "自殺",
+            "自傷",
         ]
 
         # クエリに含まれるキーワードを抽出
@@ -104,9 +139,9 @@ class KnowledgeBaseSystem:
         query_words.extend(query_lower.split())
 
         if category:
-            cursor.execute('SELECT * FROM knowledge_items WHERE category = ?', (category,))
+            cursor.execute("SELECT * FROM knowledge_items WHERE category = ?", (category,))
         else:
-            cursor.execute('SELECT * FROM knowledge_items')
+            cursor.execute("SELECT * FROM knowledge_items")
 
         rows = cursor.fetchall()
         conn.close()
@@ -150,7 +185,7 @@ class KnowledgeBaseSystem:
                     content=content,
                     tags=tags,
                     relevance_keywords=keywords,
-                    created_at=created_at
+                    created_at=created_at,
                 )
                 scored_items.append((score, item))
 
@@ -158,15 +193,15 @@ class KnowledgeBaseSystem:
         scored_items.sort(key=lambda x: x[0], reverse=True)
         return [item for _, item in scored_items[:limit]]
 
-    def get_all_knowledge(self, category: Optional[str] = None) -> List[KnowledgeItem]:
+    def get_all_knowledge(self, category: Optional[str] = None) -> list[KnowledgeItem]:
         """全知識を取得"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         if category:
-            cursor.execute('SELECT * FROM knowledge_items WHERE category = ?', (category,))
+            cursor.execute("SELECT * FROM knowledge_items WHERE category = ?", (category,))
         else:
-            cursor.execute('SELECT * FROM knowledge_items')
+            cursor.execute("SELECT * FROM knowledge_items")
 
         rows = cursor.fetchall()
         conn.close()
@@ -174,35 +209,35 @@ class KnowledgeBaseSystem:
         items = []
         for row in rows:
             item_id, cat, title, content, tags_str, keywords_str, created_at = row
-            items.append(KnowledgeItem(
-                id=item_id,
-                category=cat,
-                title=title,
-                content=content,
-                tags=json.loads(tags_str),
-                relevance_keywords=json.loads(keywords_str),
-                created_at=created_at
-            ))
+            items.append(
+                KnowledgeItem(
+                    id=item_id,
+                    category=cat,
+                    title=title,
+                    content=content,
+                    tags=json.loads(tags_str),
+                    relevance_keywords=json.loads(keywords_str),
+                    created_at=created_at,
+                )
+            )
 
         return items
 
-    def get_stats(self) -> Dict[str, Any]:
+    def get_stats(self) -> dict[str, Any]:
         """統計情報を取得"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('SELECT COUNT(*) FROM knowledge_items')
+        cursor.execute("SELECT COUNT(*) FROM knowledge_items")
         total_count = cursor.fetchone()[0]
 
-        cursor.execute('SELECT category, COUNT(*) FROM knowledge_items GROUP BY category')
+        cursor.execute("SELECT category, COUNT(*) FROM knowledge_items GROUP BY category")
         by_category = {row[0]: row[1] for row in cursor.fetchall()}
 
         conn.close()
 
-        return {
-            "total_items": total_count,
-            "by_category": by_category
-        }
+        return {"total_items": total_count, "by_category": by_category}
+
 
 # グローバルインスタンス
 knowledge_base = KnowledgeBaseSystem()

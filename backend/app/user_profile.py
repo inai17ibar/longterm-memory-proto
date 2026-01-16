@@ -3,25 +3,28 @@
 メンタルヘルスカウンセリングに特化したユーザー情報をSQLiteで永続化
 """
 
-import os
 import json
+import os
 import sqlite3
+from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Dict, Any, Optional, List
-from dataclasses import dataclass, asdict, field
+from typing import Any, Optional
+
 import openai
+
 from app.config import USER_PROFILES_DB_PATH
 
 
 @dataclass
 class UserProfile:
     """ユーザープロファイルのデータクラス"""
+
     user_id: str
 
     # 基本情報
     name: Optional[str] = None
     job: Optional[str] = None
-    hobbies: List[str] = field(default_factory=list)
+    hobbies: list[str] = field(default_factory=list)
     age: Optional[str] = None
     location: Optional[str] = None
     family: Optional[str] = None
@@ -44,7 +47,7 @@ class UserProfile:
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
     updated_at: str = field(default_factory=lambda: datetime.now().isoformat())
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         """辞書形式に変換"""
         return asdict(self)
 
@@ -69,7 +72,8 @@ class UserProfileSystem:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('''
+        cursor.execute(
+            """
             CREATE TABLE IF NOT EXISTS user_profiles (
                 user_id TEXT PRIMARY KEY,
                 name TEXT,
@@ -93,11 +97,12 @@ class UserProfileSystem:
                 created_at TEXT NOT NULL,
                 updated_at TEXT NOT NULL
             )
-        ''')
+        """
+        )
 
         # インデックス作成
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_user_id ON user_profiles(user_id)')
-        cursor.execute('CREATE INDEX IF NOT EXISTS idx_updated_at ON user_profiles(updated_at)')
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_user_id ON user_profiles(user_id)")
+        cursor.execute("CREATE INDEX IF NOT EXISTS idx_updated_at ON user_profiles(updated_at)")
 
         conn.commit()
         conn.close()
@@ -108,7 +113,7 @@ class UserProfileSystem:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('SELECT * FROM user_profiles WHERE user_id = ?', (user_id,))
+        cursor.execute("SELECT * FROM user_profiles WHERE user_id = ?", (user_id,))
         row = cursor.fetchone()
         conn.close()
 
@@ -140,7 +145,7 @@ class UserProfileSystem:
             daily_routine=row[17],
             emotional_state=row[18],
             created_at=row[19],
-            updated_at=row[20]
+            updated_at=row[20],
         )
 
     def create_or_update_profile(self, profile: UserProfile) -> bool:
@@ -154,7 +159,8 @@ class UserProfileSystem:
 
         hobbies_json = json.dumps(profile.hobbies, ensure_ascii=False)
 
-        cursor.execute('''
+        cursor.execute(
+            """
             INSERT OR REPLACE INTO user_profiles (
                 user_id, name, job, hobbies, age, location, family,
                 concerns, goals, personality, experiences, symptoms,
@@ -162,22 +168,39 @@ class UserProfileSystem:
                 work_status, daily_routine, emotional_state,
                 created_at, updated_at
             ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-        ''', (
-            profile.user_id, profile.name, profile.job, hobbies_json,
-            profile.age, profile.location, profile.family,
-            profile.concerns, profile.goals, profile.personality,
-            profile.experiences, profile.symptoms, profile.triggers,
-            profile.coping_methods, profile.support_system, profile.medication,
-            profile.work_status, profile.daily_routine, profile.emotional_state,
-            profile.created_at, profile.updated_at
-        ))
+        """,
+            (
+                profile.user_id,
+                profile.name,
+                profile.job,
+                hobbies_json,
+                profile.age,
+                profile.location,
+                profile.family,
+                profile.concerns,
+                profile.goals,
+                profile.personality,
+                profile.experiences,
+                profile.symptoms,
+                profile.triggers,
+                profile.coping_methods,
+                profile.support_system,
+                profile.medication,
+                profile.work_status,
+                profile.daily_routine,
+                profile.emotional_state,
+                profile.created_at,
+                profile.updated_at,
+            ),
+        )
 
         conn.commit()
         conn.close()
         return True
 
-    async def extract_and_update_profile(self, user_id: str, user_message: str,
-                                        ai_response: str = "") -> bool:
+    async def extract_and_update_profile(
+        self, user_id: str, user_message: str, ai_response: str = ""
+    ) -> bool:
         """会話からプロファイル情報を抽出して更新"""
         existing_profile = self.get_profile(user_id)
 
@@ -215,8 +238,9 @@ class UserProfileSystem:
 
         return updated
 
-    async def _extract_info_from_message(self, user_message: str,
-                                         ai_response: str = "") -> Dict[str, Any]:
+    async def _extract_info_from_message(
+        self, user_message: str, ai_response: str = ""
+    ) -> dict[str, Any]:
         """メッセージから情報を抽出"""
         if not self.client:
             # フォールバック：簡易的なキーワードベース抽出
@@ -261,19 +285,22 @@ class UserProfileSystem:
             response = self.client.chat.completions.create(
                 model="gpt-4o-mini",
                 messages=[
-                    {"role": "system", "content": "あなたはメンタルヘルス情報を正確に抽出するAIアシスタントです。JSONフォーマットでのみ回答してください。"},
-                    {"role": "user", "content": extraction_prompt}
+                    {
+                        "role": "system",
+                        "content": "あなたはメンタルヘルス情報を正確に抽出するAIアシスタントです。JSONフォーマットでのみ回答してください。",
+                    },
+                    {"role": "user", "content": extraction_prompt},
                 ],
                 max_tokens=500,
-                temperature=0.1
+                temperature=0.1,
             )
 
             extracted_text = response.choices[0].message.content.strip()
 
             # JSONパース
-            if extracted_text.startswith('```json'):
+            if extracted_text.startswith("```json"):
                 extracted_text = extracted_text[7:-3].strip()
-            elif extracted_text.startswith('```'):
+            elif extracted_text.startswith("```"):
                 extracted_text = extracted_text[3:-3].strip()
 
             return json.loads(extracted_text)
@@ -282,22 +309,26 @@ class UserProfileSystem:
             print(f"Error in profile extraction: {e}")
             return self._fallback_extraction(user_message)
 
-    def _fallback_extraction(self, user_message: str) -> Dict[str, Any]:
+    def _fallback_extraction(self, user_message: str) -> dict[str, Any]:
         """フォールバック：簡易的なキーワードベース抽出"""
         extracted = {}
         message_lower = user_message.lower()
 
         # メンタルヘルス関連のキーワードマッチング
-        if any(word in message_lower for word in ['不安', '心配', '悩み', '困って', '辛い', '苦しい']):
-            extracted['concerns'] = user_message
-        if any(word in message_lower for word in ['目標', 'やりたい', '頑張り', '復職', '改善']):
-            extracted['goals'] = user_message
-        if any(word in message_lower for word in ['眠れない', '食欲', '体調', '症状', '痛み', '疲れ']):
-            extracted['symptoms'] = user_message
-        if any(word in message_lower for word in ['ストレス', 'プレッシャー', '原因', 'きっかけ']):
-            extracted['triggers'] = user_message
-        if any(word in message_lower for word in ['散歩', 'リラックス', '気分転換', '対処']):
-            extracted['coping_methods'] = user_message
+        if any(
+            word in message_lower for word in ["不安", "心配", "悩み", "困って", "辛い", "苦しい"]
+        ):
+            extracted["concerns"] = user_message
+        if any(word in message_lower for word in ["目標", "やりたい", "頑張り", "復職", "改善"]):
+            extracted["goals"] = user_message
+        if any(
+            word in message_lower for word in ["眠れない", "食欲", "体調", "症状", "痛み", "疲れ"]
+        ):
+            extracted["symptoms"] = user_message
+        if any(word in message_lower for word in ["ストレス", "プレッシャー", "原因", "きっかけ"]):
+            extracted["triggers"] = user_message
+        if any(word in message_lower for word in ["散歩", "リラックス", "気分転換", "対処"]):
+            extracted["coping_methods"] = user_message
 
         return extracted
 
@@ -337,7 +368,7 @@ class UserProfileSystem:
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
-        cursor.execute('DELETE FROM user_profiles WHERE user_id = ?', (user_id,))
+        cursor.execute("DELETE FROM user_profiles WHERE user_id = ?", (user_id,))
         deleted = cursor.rowcount > 0
 
         conn.commit()
