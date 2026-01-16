@@ -6,13 +6,19 @@ import sys
 from datetime import datetime
 from io import StringIO
 from pathlib import Path
-from typing import Any, Optional
+from typing import Any
 
 import openai
 from dotenv import load_dotenv
 from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
+
+from .analysis_layer import analysis_layer
+from .extended_profile import ExtendedUserProfile, extended_profile_system
+from .knowledge_base import knowledge_base
+from .memory_system import MemoryItem, memory_system
+from .user_profile import UserProfile, user_profile_system
 
 # Windowsコンソールでの文字化け対策
 if sys.platform == "win32":
@@ -35,20 +41,6 @@ logging.basicConfig(
     handlers=[logging.FileHandler(log_file, encoding="utf-8"), logging.StreamHandler(sys.stdout)],
 )
 logger = logging.getLogger(__name__)
-
-# LangChain記憶システムをインポート
-# 分析・推論層をインポート
-from .analysis_layer import analysis_layer
-
-# 拡張プロファイルシステムをインポート
-from .extended_profile import ExtendedUserProfile, extended_profile_system
-
-# RAG知識ベースシステムをインポート
-from .knowledge_base import knowledge_base
-from .memory_system import MemoryItem, memory_system
-
-# ユーザープロファイルシステムをインポート
-from .user_profile import UserProfile, user_profile_system
 
 load_dotenv()
 
@@ -84,11 +76,11 @@ client = openai.OpenAI(api_key=os.getenv("OPENAI_API_KEY"))
 
 class UserInfo(BaseModel):
     user_id: str
-    name: Optional[str] = None
-    hobbies: Optional[list[str]] = None
-    job: Optional[str] = None
-    other_info: Optional[dict[str, Any]] = None
-    memory_items: Optional[list[dict[str, Any]]] = None
+    name: str | None = None
+    hobbies: list[str] | None = None
+    job: str | None = None
+    other_info: dict[str, Any] | None = None
+    memory_items: list[dict[str, Any]] | None = None
 
 
 class ChatMessage(BaseModel):
@@ -484,7 +476,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
             patterns = user_state["contextual_patterns"]
             if patterns:
                 contextual_info = "\n文脈パターン:\n"
-                for key, value in patterns.items():
+                for _key, value in patterns.items():
                     contextual_info += f"  - {value}\n"
 
         state_text = f"""
@@ -1226,7 +1218,7 @@ async def get_user_memories(user_id: str):
 
 
 @app.get("/api/knowledge")
-async def get_all_knowledge(category: Optional[str] = None):
+async def get_all_knowledge(category: str | None = None):
     """全知識ベースを取得"""
     items = knowledge_base.get_all_knowledge(category=category)
 
@@ -1248,7 +1240,7 @@ async def get_all_knowledge(category: Optional[str] = None):
 
 
 @app.get("/api/knowledge/search")
-async def search_knowledge(query: str, category: Optional[str] = None, limit: int = 5):
+async def search_knowledge(query: str, category: str | None = None, limit: int = 5):
     """知識を検索"""
     items = knowledge_base.search_knowledge(query, category=category, limit=limit)
 

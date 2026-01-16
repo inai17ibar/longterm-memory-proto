@@ -7,7 +7,7 @@ import os
 import sqlite3
 from dataclasses import dataclass
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from app.config import MEMORIES_DB_PATH
 
@@ -15,9 +15,7 @@ try:
     # LangChain imports (graceful fallback if not installed)
     from langchain.embeddings import OpenAIEmbeddings
     from langchain.llms import OpenAI
-    from langchain.memory import ConversationSummaryBufferMemory
     from langchain.schema import Document
-    from langchain.text_splitter import RecursiveCharacterTextSplitter
     from langchain.vectorstores import Chroma
 
     LANGCHAIN_AVAILABLE = True
@@ -37,7 +35,7 @@ class MemoryItem:
     importance_score: float  # 0.0 - 1.0（保存時の基本重要度）
     timestamp: datetime
     metadata: dict[str, Any]
-    embedding_vector: Optional[list[float]] = None
+    embedding_vector: list[float] | None = None
 
     def get_current_importance(self) -> float:
         """時間減衰を考慮した現在の重要度を取得"""
@@ -168,7 +166,7 @@ class MemoryImportanceCalculator:
             return 0.5
 
     @classmethod
-    def _calculate_temporal_importance(cls, timestamp_str: Optional[str]) -> float:
+    def _calculate_temporal_importance(cls, timestamp_str: str | None) -> float:
         """時間的な重要度を計算（新しいほど重要）"""
         if not timestamp_str:
             return 0.5
@@ -186,7 +184,7 @@ class MemoryImportanceCalculator:
                 return 0.6
             else:
                 return 0.3
-        except:
+        except Exception:
             return 0.5
 
     @classmethod
@@ -206,7 +204,7 @@ class MemoryImportanceCalculator:
 class LangChainMemorySystem:
     """LangChainベースの高度な記憶システム（SQLite永続化対応）"""
 
-    def __init__(self, openai_api_key: Optional[str] = None, db_path: str = None):
+    def __init__(self, openai_api_key: str | None = None, db_path: str = None):
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.vector_store = None
         self.embeddings = None
@@ -330,7 +328,6 @@ class LangChainMemorySystem:
             print("LangChain memory system initialized successfully")
         except Exception as e:
             print(f"Failed to initialize LangChain: {e}")
-            LANGCHAIN_AVAILABLE = False
 
     def _is_quality_memory(self, content: str, memory_type: str, user_id: str) -> tuple[bool, str]:
         """
@@ -338,9 +335,9 @@ class LangChainMemorySystem:
         Returns: (is_valid, reason)
         """
         # 最小文字数チェック
-        MIN_LENGTH = 5
-        if len(content.strip()) < MIN_LENGTH:
-            return False, f"短すぎる（{len(content)}文字 < {MIN_LENGTH}文字）"
+        min_length = 5
+        if len(content.strip()) < min_length:
+            return False, f"短すぎる（{len(content)}文字 < {min_length}文字）"
 
         # 意味のない記憶（単一単語のみ）をフィルタ
         if len(content.split()) == 1 and len(content) < 10:
@@ -415,8 +412,8 @@ class LangChainMemorySystem:
         )
 
         # 低重要度記憶のフィルタリング（閾値以下は保存しない）
-        MIN_IMPORTANCE = 0.15
-        if importance_score < MIN_IMPORTANCE:
+        min_importance = 0.15
+        if importance_score < min_importance:
             print(f"Memory rejected: Low importance ({importance_score:.2f}) - '{content[:50]}'")
             return ""
 
@@ -558,13 +555,13 @@ class LangChainMemorySystem:
         # ベクトルストアからも削除
         if LANGCHAIN_AVAILABLE and self.vector_store:
             try:
-                for memory in removed_memories:
+                for _memory in removed_memories:
                     # Note: ChromaDBの個別削除は複雑なので、定期的な再構築を推奨
                     pass
             except Exception as e:
                 print(f"Failed to remove from vector store: {e}")
 
-    async def summarize_memories(self, user_id: str, memory_type: Optional[str] = None) -> str:
+    async def summarize_memories(self, user_id: str, memory_type: str | None = None) -> str:
         """記憶を要約"""
         if user_id not in self.memory_items:
             return "記憶がありません。"

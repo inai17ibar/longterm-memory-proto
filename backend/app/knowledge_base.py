@@ -6,7 +6,7 @@ import json
 import os
 import sqlite3
 from dataclasses import dataclass
-from typing import Any, Optional
+from typing import Any
 
 import openai
 
@@ -29,7 +29,7 @@ class KnowledgeItem:
 class KnowledgeBaseSystem:
     """RAG用の知識ベース管理システム"""
 
-    def __init__(self, db_path: str = None, openai_api_key: Optional[str] = None):
+    def __init__(self, db_path: str = None, openai_api_key: str | None = None):
         self.db_path = str(db_path or KNOWLEDGE_BASE_DB_PATH)
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.client = openai.OpenAI(api_key=self.openai_api_key) if self.openai_api_key else None
@@ -87,7 +87,7 @@ class KnowledgeBaseSystem:
         conn.close()
 
     def search_knowledge(
-        self, query: str, category: Optional[str] = None, limit: int = 5
+        self, query: str, category: str | None = None, limit: int = 5
     ) -> list[KnowledgeItem]:
         """知識を検索（キーワードベース）"""
         conn = sqlite3.connect(self.db_path)
@@ -193,7 +193,7 @@ class KnowledgeBaseSystem:
         scored_items.sort(key=lambda x: x[0], reverse=True)
         return [item for _, item in scored_items[:limit]]
 
-    def get_all_knowledge(self, category: Optional[str] = None) -> list[KnowledgeItem]:
+    def get_all_knowledge(self, category: str | None = None) -> list[KnowledgeItem]:
         """全知識を取得"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

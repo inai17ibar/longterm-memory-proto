@@ -8,7 +8,7 @@ import os
 import sqlite3
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import openai
 
@@ -22,26 +22,26 @@ class UserProfile:
     user_id: str
 
     # 基本情報
-    name: Optional[str] = None
-    job: Optional[str] = None
+    name: str | None = None
+    job: str | None = None
     hobbies: list[str] = field(default_factory=list)
-    age: Optional[str] = None
-    location: Optional[str] = None
-    family: Optional[str] = None
+    age: str | None = None
+    location: str | None = None
+    family: str | None = None
 
     # メンタルヘルス関連
-    concerns: Optional[str] = None  # 現在の悩みや不安
-    goals: Optional[str] = None  # 目標や願望
-    personality: Optional[str] = None  # 性格的特徴
-    experiences: Optional[str] = None  # 重要な体験
-    symptoms: Optional[str] = None  # メンタル・身体的症状
-    triggers: Optional[str] = None  # ストレス要因
-    coping_methods: Optional[str] = None  # 対処法
-    support_system: Optional[str] = None  # サポート体制
-    medication: Optional[str] = None  # 服薬・通院状況
-    work_status: Optional[str] = None  # 勤務・休職・復職状況
-    daily_routine: Optional[str] = None  # 日常の過ごし方
-    emotional_state: Optional[str] = None  # 現在の気持ち・感情状態
+    concerns: str | None = None  # 現在の悩みや不安
+    goals: str | None = None  # 目標や願望
+    personality: str | None = None  # 性格的特徴
+    experiences: str | None = None  # 重要な体験
+    symptoms: str | None = None  # メンタル・身体的症状
+    triggers: str | None = None  # ストレス要因
+    coping_methods: str | None = None  # 対処法
+    support_system: str | None = None  # サポート体制
+    medication: str | None = None  # 服薬・通院状況
+    work_status: str | None = None  # 勤務・休職・復職状況
+    daily_routine: str | None = None  # 日常の過ごし方
+    emotional_state: str | None = None  # 現在の気持ち・感情状態
 
     # メタデータ
     created_at: str = field(default_factory=lambda: datetime.now().isoformat())
@@ -59,7 +59,7 @@ class UserProfile:
 class UserProfileSystem:
     """ユーザープロファイル管理システム"""
 
-    def __init__(self, db_path: str = None, openai_api_key: Optional[str] = None):
+    def __init__(self, db_path: str = None, openai_api_key: str | None = None):
         self.db_path = str(db_path or USER_PROFILES_DB_PATH)
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.client = openai.OpenAI(api_key=self.openai_api_key) if self.openai_api_key else None
@@ -108,7 +108,7 @@ class UserProfileSystem:
         conn.close()
         print(f"User profile database initialized at {self.db_path}")
 
-    def get_profile(self, user_id: str) -> Optional[UserProfile]:
+    def get_profile(self, user_id: str) -> UserProfile | None:
         """ユーザープロファイルを取得"""
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()

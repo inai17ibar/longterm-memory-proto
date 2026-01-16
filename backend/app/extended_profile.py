@@ -8,7 +8,7 @@ import json
 import os
 from dataclasses import asdict, dataclass, field
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 from app.config import EXTENDED_PROFILES_JSON_PATH
 
@@ -24,7 +24,7 @@ class ProfileSettings:
     response_length_style: str = "medium"  # short/medium/long
     profile_initialized_at: int = field(default_factory=lambda: int(datetime.now().timestamp()))
     # カスタムシステムプロンプト
-    custom_system_prompt: Optional[str] = None  # Noneの場合はデフォルトプロンプトを使用
+    custom_system_prompt: str | None = None  # Noneの場合はデフォルトプロンプトを使用
 
 
 @dataclass
@@ -32,36 +32,36 @@ class GeneralProfile:
     """一般的なプロファイル情報"""
 
     hobbies: list[str] = field(default_factory=list)
-    occupation: Optional[str] = None
-    location: Optional[str] = None
-    age: Optional[str] = None
-    family: Optional[str] = None
+    occupation: str | None = None
+    location: str | None = None
+    age: str | None = None
+    family: str | None = None
 
 
 @dataclass
 class MentalProfile:
     """メンタルヘルス関連プロファイル"""
 
-    recent_medication_change: Optional[str] = None
-    current_mental_state: Optional[str] = None
-    symptoms: Optional[str] = None
-    triggers: Optional[str] = None
-    coping_methods: Optional[str] = None
-    support_system: Optional[str] = None
+    recent_medication_change: str | None = None
+    current_mental_state: str | None = None
+    symptoms: str | None = None
+    triggers: str | None = None
+    coping_methods: str | None = None
+    support_system: str | None = None
 
 
 @dataclass
 class Favorites:
     """お気に入り情報"""
 
-    comedian: Optional[str] = None
-    favorite_food: Optional[str] = None
-    favorite_animal: Optional[str] = None
-    tv_drama: Optional[str] = None
+    comedian: str | None = None
+    favorite_food: str | None = None
+    favorite_animal: str | None = None
+    tv_drama: str | None = None
     comedians: list[str] = field(default_factory=list)
-    food: Optional[str] = None
-    beverage: Optional[str] = None
-    drink: Optional[str] = None
+    food: str | None = None
+    beverage: str | None = None
+    drink: str | None = None
     # 動的に追加されるフィールド用
     extra: dict[str, Any] = field(default_factory=dict)
 
@@ -155,9 +155,7 @@ class ExtendedUserProfile:
         """辞書形式に変換"""
         result = {}
         for key, value in asdict(self).items():
-            if isinstance(value, dict):
-                result[key] = value
-            elif isinstance(value, list):
+            if isinstance(value, dict | list):
                 result[key] = value
             else:
                 result[key] = value
@@ -297,7 +295,7 @@ class ExtendedProfileSystem:
 
         print(f"Saved {len(self.profiles)} extended profiles to {self.json_file_path}")
 
-    def get_profile(self, user_id: str) -> Optional[ExtendedUserProfile]:
+    def get_profile(self, user_id: str) -> ExtendedUserProfile | None:
         """プロファイルを取得"""
         return self.profiles.get(user_id)
 

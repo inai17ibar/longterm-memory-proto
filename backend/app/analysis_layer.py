@@ -7,7 +7,7 @@ import json
 import os
 import re
 from datetime import datetime
-from typing import Any, Optional
+from typing import Any
 
 import openai
 
@@ -18,7 +18,7 @@ from .user_profile import UserProfile
 class AnalysisLayer:
     """分析・推論層クラス"""
 
-    def __init__(self, openai_api_key: Optional[str] = None):
+    def __init__(self, openai_api_key: str | None = None):
         self.openai_api_key = openai_api_key or os.getenv("OPENAI_API_KEY")
         self.client = openai.OpenAI(api_key=self.openai_api_key) if self.openai_api_key else None
 
@@ -26,7 +26,7 @@ class AnalysisLayer:
         self,
         user_id: str,
         user_message: str,
-        user_profile: Optional[UserProfile],
+        user_profile: UserProfile | None,
         recent_conversations: list[dict[str, Any]],
         relevant_memories: list[MemoryItem],
     ) -> dict[str, Any]:
@@ -100,7 +100,7 @@ class AnalysisLayer:
 
         return summary
 
-    def _summarize_profile(self, profile: Optional[UserProfile]) -> str:
+    def _summarize_profile(self, profile: UserProfile | None) -> str:
         """プロファイル情報を要約"""
         if not profile:
             return "（プロファイル情報なし）"
@@ -295,7 +295,7 @@ class AnalysisLayer:
 
     def _analyze_contextual_patterns(
         self,
-        user_profile: Optional[UserProfile],
+        user_profile: UserProfile | None,
         recent_conversations: list[dict[str, Any]],
         current_state: dict[str, Any],
     ) -> dict[str, Any]:
@@ -311,10 +311,13 @@ class AnalysisLayer:
 
         # 週末・平日分析
         current_weekday = datetime.now().weekday()
-        if current_weekday < 5:  # 月〜金
-            if user_profile and user_profile.work_status:
-                if "休職" not in user_profile.work_status:
-                    patterns["weekday_stress"] = "平日の勤務日です"
+        if (
+            current_weekday < 5
+            and user_profile
+            and user_profile.work_status
+            and "休職" not in user_profile.work_status
+        ):
+            patterns["weekday_stress"] = "平日の勤務日です"
 
         # トレンド分析（過去3日の会話から）
         if len(recent_conversations) >= 3:
@@ -324,7 +327,7 @@ class AnalysisLayer:
         return patterns
 
     def suggest_response_approach(
-        self, user_state: dict[str, Any], user_profile: Optional[UserProfile]
+        self, user_state: dict[str, Any], user_profile: UserProfile | None
     ) -> dict[str, Any]:
         """応答アプローチを提案"""
         suggestions = {
