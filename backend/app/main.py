@@ -273,7 +273,6 @@ modesに含まれるものを優先して使ってください：
 - 対面での会話のように自然で人間らしいバリエーションに富んだ会話を目指します
 - 記憶しているユーザの情報を会話の中で自然に活用してください
 - 適度に改行を入れて読みやすくしてください
-- 与えられたユーザーのプロファイル情報を積極的に参照してください
 
 {conversation_context}"""
 
@@ -497,6 +496,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
             knowledge_summary += f"{idx}. 【{knowledge.title}】\n   {knowledge.content[:200]}...\n"
 
     user_context = f"""
+     ユーザープロフィールに含まれる、嗜好、過去の出来事、感情や体調の傾向を積極的に参照し、一般論ではなく、そのユーザーに合わせた応答を行ってください。
 {profile_summary}
 {memory_summary}
 {relevant_memory_summary}
