@@ -211,7 +211,7 @@ def analyze_response_pattern(user_message: str, conversation_history: list[dict]
 
 
 def generate_system_prompt(
-    user_context: str, conversation_context: str, response_pattern: int, extended_profile=None
+    conversation_context: str, response_pattern: int, extended_profile=None
 ) -> str:
     """回答パターンに応じたシステムプロンプトを生成"""
 
@@ -232,7 +232,6 @@ def generate_system_prompt(
     if custom_prompt:
         # カスタムプロンプトに変数を置換
         prompt = custom_prompt
-        prompt = prompt.replace("{user_context}", user_context)
         prompt = prompt.replace("{conversation_context}", conversation_context)
         prompt = prompt.replace("{ai_name}", ai_name)
         prompt = prompt.replace("{ai_personality}", ai_personality)
@@ -257,7 +256,7 @@ def generate_system_prompt(
 - ユーザーにとって「ここでは自分らしくいられる」「居心地が良い」場所を提供してください
 
 ## 会話モード
-user_context内には「このターンで優先したいモード」が含まれます。
+ユーザーコンテキストメッセージ内には「このターンで優先したいモード」が含まれます。
 modesに含まれるものを優先して使ってください：
 
 - empathy: 共感・受容を前面に出し、「わかってもらえた感」を最優先にする
@@ -274,8 +273,6 @@ modesに含まれるものを優先して使ってください：
 - 対面での会話のように自然で人間らしいバリエーションに富んだ会話を目指します
 - 記憶しているユーザの情報を会話の中で自然に活用してください
 - 適度に改行を入れて読みやすくしてください
-
-{user_context}
 
 {conversation_context}"""
 
@@ -529,9 +526,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
                 f"{user_display_name}: {conv['user_message']}\n{ai_name}: {conv['ai_response']}\n\n"
             )
 
-    system_prompt = generate_system_prompt(
-        user_context, conversation_context, response_pattern, extended_profile
-    )
+    system_prompt = generate_system_prompt(conversation_context, response_pattern, extended_profile)
 
     # デバッグログ
     if extended_profile:
@@ -571,6 +566,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
                 "model": user_model_settings["model"],
                 "messages": [
                     {"role": "system", "content": system_prompt},
+                    {"role": "user", "content": user_context},
                     {"role": "user", "content": message},
                 ],
                 "max_tokens": user_model_settings["max_tokens"],
