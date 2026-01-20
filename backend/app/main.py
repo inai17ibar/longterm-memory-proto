@@ -274,6 +274,14 @@ modesに含まれるものを優先して使ってください：
 - 記憶しているユーザの情報を会話の中で自然に活用してください
 - 適度に改行を入れて読みやすくしてください
 
+重要指示:
+- 上記のプロファイル・記憶を会話の中で**能動的かつ自然に**活用してください
+- 「～さんは以前〇〇とおっしゃっていましたね」「～について頑張っていますね」のように、こちらから記憶を参照してください
+- ユーザーが「私の名前は？」と聞かなくても、適切なタイミングで記憶している情報を使って声をかけてください
+- 過去の悩みや目標の進捗を気にかけ、継続的なサポートを示してください
+- 関連する専門知識がある場合は、それを自然に会話に織り込んでください（専門用語の押し付けは避ける）
+- プロファイルに記録された症状やストレス要因を踏まえて、個別化された応答を心がけてください
+
 {conversation_context}"""
 
     if response_pattern == 1:
@@ -401,7 +409,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
     relevant_memories = await memory_system.retrieve_relevant_memories(user_id, message, limit=10)
 
     # ★ ユーザー状態の分析（メタ推論ステップ）
-    recent_conversations = conversations[user_id][-10:] if conversations[user_id] else []
+    recent_conversations = conversations[user_id][-100:] if conversations[user_id] else []
     user_state = await analyze_user_state(
         user_id=user_id,
         user_message=message,
@@ -503,13 +511,6 @@ async def chat_with_counselor(chat_message: ChatMessage):
 {state_text}
 {knowledge_summary}
 
-重要指示:
-- 上記のプロファイル・記憶を会話の中で**能動的かつ自然に**活用してください
-- 「～さんは以前〇〇とおっしゃっていましたね」「～について頑張っていますね」のように、こちらから記憶を参照してください
-- ユーザーが「私の名前は？」と聞かなくても、適切なタイミングで記憶している情報を使って声をかけてください
-- 過去の悩みや目標の進捗を気にかけ、継続的なサポートを示してください
-- 関連する専門知識がある場合は、それを自然に会話に織り込んでください（専門用語の押し付けは避ける）
-- プロファイルに記録された症状やストレス要因を踏まえて、個別化された応答を心がけてください
 """
 
     # 会話履歴にユーザー名とAI名を反映
@@ -518,7 +519,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
     )
     ai_name = extended_profile.profile_settings.ai_name if extended_profile else "カウンセラー"
 
-    recent_conversations = conversations[user_id][-10:] if conversations[user_id] else []
+    recent_conversations = conversations[user_id][-100:] if conversations[user_id] else []
     conversation_context = ""
     if recent_conversations:
         conversation_context = "\n過去の会話:\n"
@@ -562,14 +563,24 @@ async def chat_with_counselor(chat_message: ChatMessage):
                 user_id, {"model": "gpt-4o", "temperature": 0.7, "max_tokens": 500}
             )
 
+            # 会話履歴をmessages配列に追加
+            messages = [
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_context},
+            ]
+
+            # 過去の会話をmessages配列に追加（最新100件）
+            for conv in recent_conversations:
+                messages.append({"role": "user", "content": conv["user_message"]})
+                messages.append({"role": "assistant", "content": conv["ai_response"]})
+
+            # 現在のユーザーメッセージを追加
+            messages.append({"role": "user", "content": message})
+
             # OpenAI API リクエストのログ
             api_request = {
                 "model": user_model_settings["model"],
-                "messages": [
-                    {"role": "system", "content": system_prompt},
-                    {"role": "user", "content": user_context},
-                    {"role": "user", "content": message},
-                ],
+                "messages": messages,
                 "max_tokens": user_model_settings["max_tokens"],
                 "temperature": user_model_settings["temperature"],
             }
