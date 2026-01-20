@@ -123,13 +123,20 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
             onChange={(e) => setModel(e.target.value)}
             className="model-select"
           >
-            <option value="o1">o1 (最新・最高性能)</option>
-            <option value="o1-mini">o1-mini (推論特化・高速)</option>
-            <option value="gpt-4o">GPT-4o (推奨)</option>
+            <option value="gpt-4.1-2025-04-14">
+              GPT-4.1 (2025年最新・最高性能)
+            </option>
+            <option value="gpt-4.1-mini-2025-04-14">
+              GPT-4.1 mini (最新・バランス型)
+            </option>
+            <option value="gpt-4.1-nano-2025-04-14">
+              GPT-4.1 nano (最新・超高速)
+            </option>
+            <option value="gpt-4o">GPT-4o (高性能)</option>
             <option value="gpt-4o-mini">GPT-4o-mini (高速・低コスト)</option>
-            <option value="gpt-4-turbo">GPT-4 Turbo</option>
-            <option value="gpt-4">GPT-4</option>
-            <option value="gpt-3.5-turbo">GPT-3.5 Turbo</option>
+            <option value="gpt-4-turbo">GPT-4 Turbo (安定版)</option>
+            <option value="gpt-4">GPT-4 (オリジナル)</option>
+            <option value="gpt-3.5-turbo">GPT-3.5 Turbo (旧世代)</option>
           </select>
           <p style={{ fontSize: "12px", color: "#6b7280", marginTop: "4px" }}>
             使用するOpenAI GPTモデルを選択してください
