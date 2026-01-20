@@ -558,7 +558,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
         else:
             # ユーザーのモデル設定を取得
             user_model_settings = model_settings_storage.get(
-                user_id, {"model": "gpt-4o", "temperature": 0.7, "max_tokens": 500}
+                user_id, {"model": "gpt-4.1", "temperature": 0.7, "max_tokens": 500}
             )
 
             # 会話履歴をmessages配列に追加
@@ -806,7 +806,7 @@ async def extract_user_info(user_id: str, user_message: str, ai_response: str) -
 """
 
             response = client.chat.completions.create(
-                model="gpt-4o",
+                model="gpt-4.1",
                 messages=[
                     {
                         "role": "system",
@@ -1423,14 +1423,14 @@ async def get_model_settings(user_id: str):
         return model_settings_storage[user_id]
 
     # デフォルト設定
-    return {"model": "gpt-4o", "temperature": 0.7, "max_tokens": 500}
+    return {"model": "gpt-4.1", "temperature": 0.7, "max_tokens": 500}
 
 
 @app.post("/api/model-settings/{user_id}")
 async def update_model_settings(user_id: str, settings: dict[str, Any]):
     """ユーザーのGPTモデル設定を更新"""
     model_settings_storage[user_id] = {
-        "model": settings.get("model", "gpt-4o"),
+        "model": settings.get("model", "gpt-4.1"),
         "temperature": settings.get("temperature", 0.7),
         "max_tokens": settings.get("max_tokens", 500),
     }
