@@ -64,10 +64,14 @@ export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
       );
       const profileData = await profileResponse.json();
 
-      // カスタムプロンプトを更新
-      profileData.profile.profile_settings.custom_system_prompt = useCustom
-        ? customPrompt
-        : null;
+      // カスタムプロンプトを更新（nullの場合はプロパティを削除）
+      if (useCustom) {
+        profileData.profile.profile_settings.custom_system_prompt =
+          customPrompt;
+      } else {
+        // nullに設定するのではなく、プロパティ自体を削除
+        delete profileData.profile.profile_settings.custom_system_prompt;
+      }
 
       // プロファイルを保存
       await fetch(`${apiUrl}/api/extended-profile/${userId}`, {

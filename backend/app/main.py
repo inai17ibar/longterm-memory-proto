@@ -219,24 +219,22 @@ def generate_system_prompt(
     ai_name = "カウンセラー"
     ai_personality = "優しく寄り添うガイド"
     response_length_style = "medium"
-    custom_prompt = None
 
     if extended_profile:
         settings = extended_profile.profile_settings
         ai_name = settings.ai_name
         ai_personality = settings.ai_personality
         response_length_style = settings.response_length_style
-        custom_prompt = settings.custom_system_prompt
 
-    # カスタムプロンプトが設定されている場合はそれを使用
-    if custom_prompt:
-        # カスタムプロンプトに変数を置換
-        prompt = custom_prompt
-        prompt = prompt.replace("{conversation_context}", conversation_context)
-        prompt = prompt.replace("{ai_name}", ai_name)
-        prompt = prompt.replace("{ai_personality}", ai_personality)
-        prompt = prompt.replace("{response_pattern}", str(response_pattern))
-        return prompt
+    # カスタムプロンプト機能は削除されました
+    # if custom_prompt:
+    #     # カスタムプロンプトに変数を置換
+    #     prompt = custom_prompt
+    #     prompt = prompt.replace("{conversation_context}", conversation_context)
+    #     prompt = prompt.replace("{ai_name}", ai_name)
+    #     prompt = prompt.replace("{ai_personality}", ai_personality)
+    #     prompt = prompt.replace("{response_pattern}", str(response_pattern))
+    #     return prompt
 
     # 応答スタイルに応じた文字数制限
     length_limits = {

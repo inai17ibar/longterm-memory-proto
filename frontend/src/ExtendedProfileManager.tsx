@@ -18,11 +18,23 @@ export const ExtendedProfileManager: React.FC<ExtendedProfileManagerProps> = ({
     try {
       setIsLoading(true);
       const response = await fetch(`${apiUrl}/api/extended-profile/${userId}`);
+      if (!response.ok) {
+        throw new Error(`HTTP error! status: ${response.status}`);
+      }
       const data = await response.json();
+
+      // プロファイルからcustom_system_promptを除外
+      if (data.profile?.profile_settings?.custom_system_prompt !== undefined) {
+        delete data.profile.profile_settings.custom_system_prompt;
+      }
+
       setJsonInput(JSON.stringify(data.profile, null, 2));
+      setMessage(""); // エラーメッセージをクリア
     } catch (error) {
       console.error("Error loading extended profile:", error);
-      setMessage("プロファイルの読み込みに失敗しました");
+      setMessage(
+        "プロファイルの読み込みに失敗しました: " + (error as Error).message,
+      );
     } finally {
       setIsLoading(false);
     }
@@ -48,19 +60,46 @@ export const ExtendedProfileManager: React.FC<ExtendedProfileManagerProps> = ({
   const handleUpdate = async () => {
     try {
       setIsLoading(true);
-      const jsonData = JSON.parse(jsonInput);
-      await fetch(`${apiUrl}/api/extended-profile/${userId}`, {
+      setMessage(""); // 既存のメッセージをクリア
+
+      // JSONをパース
+      let jsonData;
+      try {
+        jsonData = JSON.parse(jsonInput);
+      } catch (parseError) {
+        throw new Error(
+          "JSONのパースに失敗しました: " + (parseError as Error).message,
+        );
+      }
+
+      // custom_system_promptが含まれていたら削除
+      if (jsonData?.profile_settings?.custom_system_prompt !== undefined) {
+        delete jsonData.profile_settings.custom_system_prompt;
+      }
+
+      // APIリクエスト
+      const response = await fetch(`${apiUrl}/api/extended-profile/${userId}`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
         },
         body: JSON.stringify(jsonData),
       });
-      setMessage("プロファイル更新完了");
+
+      if (!response.ok) {
+        const errorData = await response
+          .json()
+          .catch(() => ({ detail: "Unknown error" }));
+        throw new Error(
+          `HTTP ${response.status}: ${errorData.detail || response.statusText}`,
+        );
+      }
+
+      setMessage("✅ プロファイル更新完了");
       await loadProfile();
     } catch (error) {
       console.error("Error updating profile:", error);
-      setMessage("更新に失敗しました: " + (error as Error).message);
+      setMessage("❌ 更新に失敗しました: " + (error as Error).message);
     } finally {
       setIsLoading(false);
     }
