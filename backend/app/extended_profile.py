@@ -148,6 +148,7 @@ class ExtendedUserProfile:
     environments: dict[str, Any] = field(default_factory=dict)
     mood_trend: list[MoodEntry] = field(default_factory=list)
     user_tendency: UserTendency = field(default_factory=UserTendency)
+    time_patterns: list[dict[str, Any]] = field(default_factory=list)
 
     def to_dict(self) -> dict[str, Any]:
         """辞書形式に変換"""
@@ -261,6 +262,10 @@ class ExtendedUserProfile:
                     TimePattern(**p) for p in tendency_data["weekday_patterns"]
                 ]
             profile.user_tendency = UserTendency(**tendency_data)
+
+        # time_patterns（トップレベルのフィールド）
+        if "time_patterns" in data:
+            profile.time_patterns = data["time_patterns"]
 
         return profile
 
