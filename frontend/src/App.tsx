@@ -116,6 +116,24 @@ function App() {
 
       const data = await response.json();
 
+      // デバッグログをブラウザコンソールに出力
+      if (data.debug_logs && Array.isArray(data.debug_logs)) {
+        console.group("🔍 Backend Debug Logs");
+        data.debug_logs.forEach(
+          (log: { timestamp: string; level: string; message: string }) => {
+            const logLevel = log.level.toLowerCase();
+            if (logLevel === "error") {
+              console.error(`[${log.timestamp}]`, log.message);
+            } else if (logLevel === "warning" || logLevel === "warn") {
+              console.warn(`[${log.timestamp}]`, log.message);
+            } else {
+              console.log(`[${log.timestamp}]`, log.message);
+            }
+          },
+        );
+        console.groupEnd();
+      }
+
       const newMessage = {
         user_message: currentMessage,
         ai_response: data.response,

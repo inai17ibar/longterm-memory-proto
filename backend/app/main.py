@@ -34,6 +34,36 @@ log_dir.mkdir(exist_ok=True)
 # ログファイルの設定（日付ごとにファイルを分ける）
 log_file = log_dir / f"server_{datetime.now().strftime('%Y%m%d')}.log"
 
+
+# デバッグログを収集するためのカスタムハンドラー
+class DebugLogCollector(logging.Handler):
+    """デバッグモード時にログを収集するハンドラー"""
+
+    def __init__(self):
+        super().__init__()
+        self.logs: list[dict[str, Any]] = []
+
+    def emit(self, record: logging.LogRecord):
+        """ログレコードを収集"""
+        try:
+            log_entry = {
+                "timestamp": datetime.fromtimestamp(record.created).isoformat(),
+                "level": record.levelname,
+                "message": self.format(record),
+            }
+            self.logs.append(log_entry)
+        except Exception:
+            self.handleError(record)
+
+    def get_logs(self) -> list[dict[str, Any]]:
+        """収集したログを取得"""
+        return self.logs.copy()
+
+    def clear(self):
+        """ログをクリア"""
+        self.logs.clear()
+
+
 # ロガーの設定
 logging.basicConfig(
     level=logging.INFO,
@@ -43,6 +73,9 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 load_dotenv()
+
+# 開発モードの判定（環境変数DEBUGがTrueの場合、ブラウザコンソールにログを出力）
+DEBUG_MODE = os.getenv("DEBUG", "True").lower() in ("true", "1", "yes")
 
 app = FastAPI()
 
@@ -92,6 +125,7 @@ class ChatResponse(BaseModel):
     response: str
     response_type: int  # 1, 2, 3のどのパターンか
     user_info_updated: bool = False
+    debug_logs: list[dict[str, Any]] | None = None  # 開発モード時のデバッグログ
 
 
 async def analyze_user_state(
@@ -386,6 +420,13 @@ async def chat_with_counselor(chat_message: ChatMessage):
     user_id = chat_message.user_id
     message = chat_message.message
 
+    # デバッグモード時のログコレクター初期化
+    debug_collector = None
+    if DEBUG_MODE:
+        debug_collector = DebugLogCollector()
+        debug_collector.setFormatter(logging.Formatter("%(asctime)s - %(levelname)s - %(message)s"))
+        logger.addHandler(debug_collector)
+
     # ログ: リクエスト内容を表示
     logger.info("\n" + "=" * 80)
     logger.info("[CHAT REQUEST - RAW JSON]")
@@ -655,10 +696,17 @@ async def chat_with_counselor(chat_message: ChatMessage):
         logger.info(json.dumps(response_data, indent=2, ensure_ascii=False))
         logger.info("=" * 80 + "\n")
 
+        # デバッグログを収集
+        debug_logs = None
+        if DEBUG_MODE and debug_collector:
+            debug_logs = debug_collector.get_logs()
+            logger.removeHandler(debug_collector)
+
         return ChatResponse(
             response=ai_response,
             response_type=response_pattern,
             user_info_updated=user_info_updated,
+            debug_logs=debug_logs,
         )
 
     except Exception:
@@ -695,10 +743,17 @@ async def chat_with_counselor(chat_message: ChatMessage):
 
         user_info_updated = user_info_updated or profile_updated
 
+        # デバッグログを収集（エラー時も）
+        debug_logs = None
+        if DEBUG_MODE and debug_collector:
+            debug_logs = debug_collector.get_logs()
+            logger.removeHandler(debug_collector)
+
         return ChatResponse(
             response=ai_response,
             response_type=response_pattern,
             user_info_updated=user_info_updated,
+            debug_logs=debug_logs,
         )
 
 
