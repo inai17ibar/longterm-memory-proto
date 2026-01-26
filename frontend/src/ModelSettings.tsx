@@ -10,7 +10,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
   userId,
   apiUrl,
 }) => {
-  const [model, setModel] = useState("gpt-4o");
+  const [model, setModel] = useState("gpt-4.1-mini-2025-04-14");
   const [temperature, setTemperature] = useState(0.7);
   const [maxTokens, setMaxTokens] = useState(500);
   const [isLoading, setIsLoading] = useState(false);
@@ -23,7 +23,7 @@ export const ModelSettings: React.FC<ModelSettingsProps> = ({
         const response = await fetch(`${apiUrl}/api/model-settings/${userId}`);
         if (response.ok) {
           const data = await response.json();
-          setModel(data.model || "gpt-4o");
+          setModel(data.model || "gpt-4.1-mini-2025-04-14");
           setTemperature(data.temperature || 0.7);
           setMaxTokens(data.max_tokens || 500);
         }

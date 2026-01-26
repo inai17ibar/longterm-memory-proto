@@ -21,6 +21,11 @@ export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
   }, [userId, apiUrl]);
 
   const loadPrompts = async () => {
+    if (!userId) {
+      console.log("User ID not yet available");
+      return;
+    }
+
     try {
       setIsLoading(true);
 
@@ -35,9 +40,17 @@ export const SystemPromptEditor: React.FC<SystemPromptEditorProps> = ({
       const profileResponse = await fetch(
         `${apiUrl}/api/extended-profile/${userId}`,
       );
+
+      if (!profileResponse.ok) {
+        // プロファイルが存在しない場合はデフォルトを使用
+        setCustomPrompt(defaultData.default_prompt);
+        setUseCustom(false);
+        return;
+      }
+
       const profileData = await profileResponse.json();
 
-      if (profileData.profile.profile_settings.custom_system_prompt) {
+      if (profileData?.profile?.profile_settings?.custom_system_prompt) {
         setCustomPrompt(
           profileData.profile.profile_settings.custom_system_prompt,
         );

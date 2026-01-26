@@ -555,7 +555,7 @@ async def chat_with_counselor(chat_message: ChatMessage):
         else:
             # ユーザーのモデル設定を取得
             user_model_settings = model_settings_storage.get(
-                user_id, {"model": "gpt-4o", "temperature": 0.7, "max_tokens": 500}
+                user_id, {"model": "gpt-4.1-mini-2025-04-14", "temperature": 0.7, "max_tokens": 500}
             )
 
             # 会話履歴をmessages配列に追加
@@ -1018,7 +1018,11 @@ async def export_system_prompt_csv(user_id: str):
     profile = extended_profile_system.get_profile(user_id)
 
     if not profile:
-        raise HTTPException(status_code=404, detail="User profile not found")
+        # プロファイルが存在しない場合は新規作成
+        from .extended_profile import ExtendedUserProfile
+
+        profile = ExtendedUserProfile(user_id=user_id)
+        extended_profile_system.create_or_update_profile(profile)
 
     output = StringIO()
     writer = csv.writer(output)
@@ -1043,13 +1047,227 @@ async def export_system_prompt_csv(user_id: str):
     }
 
 
+@app.get("/api/export-prompt-debug/{user_id}")
+async def export_prompt_debug(user_id: str):
+    """Export full system prompt and context for debugging purposes"""
+    try:
+        logger.info(f"Starting export-prompt-debug for user_id: {user_id}")
+
+        # 拡張プロファイルを取得（存在しない場合は新規作成）
+        extended_profile = extended_profile_system.get_profile(user_id)
+
+        if not extended_profile:
+            logger.info(f"Profile not found for {user_id}, creating new profile")
+            # プロファイルが存在しない場合は新規作成
+            from .extended_profile import ExtendedUserProfile
+
+            extended_profile = ExtendedUserProfile(user_id=user_id)
+            extended_profile_system.create_or_update_profile(extended_profile)
+
+        # 最近の会話履歴を取得
+        recent_conversations = conversations[user_id][-100:] if user_id in conversations else []
+
+        # LangChainベースの記憶システムから関連する記憶を検索（最新のメッセージがあれば）
+        relevant_memories = []
+        if recent_conversations:
+            last_message = recent_conversations[-1].get("user_message", "")
+            relevant_memories = await memory_system.retrieve_relevant_memories(
+                user_id, last_message, limit=10
+            )
+
+        # プロファイル情報の構築
+        profile_summary = extended_profile_system.generate_profile_summary(user_id)
+
+        # メモリシステム（旧システム）
+        memory_summary = ""
+        if user_id in user_memory:
+            user_data = user_memory[user_id]
+            if user_data.get("memory_items"):
+                recent_memories_old = user_data["memory_items"][-10:]
+                memory_summary = "\n\n最近の記憶（旧システム）:\n"
+                for item in recent_memories_old:
+                    memory_summary += f"- {item['type']}: {item['content']}\n"
+
+        # LangChainベースの関連記憶
+        relevant_memory_summary = ""
+        if relevant_memories:
+            sorted_memories = sorted(
+                relevant_memories, key=lambda m: m.get_current_importance(), reverse=True
+            )
+            relevant_memory_summary = (
+                "\n\n現在の会話に関連する重要な記憶（時間減衰を考慮した重要度順）:\n"
+            )
+            for idx, memory in enumerate(sorted_memories[:5], 1):
+                days_ago = (datetime.now() - memory.timestamp).days
+                current_importance = memory.get_current_importance()
+                time_info = f"{days_ago}日前" if days_ago > 0 else "今日"
+                relevant_memory_summary += f"{idx}. [{memory.memory_type}] {memory.content}\n   (保存時: {memory.importance_score:.2f} → 現在: {current_importance:.2f}, {time_info})\n"
+
+        # 状態情報（最新があれば）
+        state_text = ""
+        if user_id in user_states:
+            user_state = user_states[user_id]
+            contextual_info = ""
+            if user_state.get("contextual_patterns"):
+                patterns = user_state["contextual_patterns"]
+                if patterns:
+                    contextual_info = "\n文脈パターン:\n"
+                    for _key, value in patterns.items():
+                        contextual_info += f"  - {value}\n"
+
+            state_text = f"""
+推定される現在の状態:
+- 気分(mood): {user_state.get('mood')}
+- エネルギー(energy): {user_state.get('energy')}
+- 不安(anxiety): {user_state.get('anxiety')}
+- 主なテーマ: {', '.join(user_state.get('main_topics', []))}
+- いま求めていそうなこと: {user_state.get('need')}
+- このターンで優先したいモード: {', '.join(user_state.get('modes', []))}
+- 状態コメント: {user_state.get('state_comment')}
+{contextual_info}
+"""
+
+        # ユーザーコンテキスト
+        user_context = f"""
+ユーザープロフィールに含まれる、嗜好、過去の出来事、感情や体調の傾向を積極的に参照し、一般論ではなく、そのユーザーに合わせた応答を行ってください。
+{profile_summary}
+{memory_summary}
+{relevant_memory_summary}
+{state_text}
+"""
+
+        # 会話履歴コンテキスト
+        user_display_name = (
+            extended_profile.profile_settings.display_name if extended_profile else "ユーザー"
+        )
+        ai_name = extended_profile.profile_settings.ai_name if extended_profile else "カウンセラー"
+
+        conversation_context = ""
+        if recent_conversations:
+            conversation_context = "\n過去の会話:\n"
+            for conv in recent_conversations:
+                conversation_context += f"{user_display_name}: {conv['user_message']}\n{ai_name}: {conv['ai_response']}\n\n"
+
+        # システムプロンプトを3つのパターンで生成
+        logger.info("Generating system prompts...")
+        system_prompt_pattern1 = generate_system_prompt(conversation_context, 1, extended_profile)
+        system_prompt_pattern2 = generate_system_prompt(conversation_context, 2, extended_profile)
+        system_prompt_pattern3 = generate_system_prompt(conversation_context, 3, extended_profile)
+
+        # CSV形式で出力
+        logger.info("Creating CSV output...")
+        output = StringIO()
+        writer = csv.writer(output)
+
+        # ヘッダー行
+        writer.writerow(["section", "content"])
+
+        # プロファイル設定
+        try:
+            if hasattr(extended_profile.profile_settings, "to_dict"):
+                profile_settings_dict = extended_profile.profile_settings.to_dict()
+            else:
+                # Fallback: dataclassの場合
+                from dataclasses import asdict
+
+                profile_settings_dict = asdict(extended_profile.profile_settings)
+            writer.writerow(
+                ["profile_settings", json.dumps(profile_settings_dict, ensure_ascii=False)]
+            )
+        except Exception as e:
+            logger.error(f"Error serializing profile_settings: {e}")
+            writer.writerow(["profile_settings", f"Error: {str(e)}"])
+
+        # カスタムシステムプロンプト（JSONファイルから直接読み取り）
+        custom_prompt = None
+        try:
+            # 拡張プロファイルのJSONファイルパスを取得
+            from app.config import EXTENDED_PROFILES_JSON_PATH
+
+            profiles_path = Path(EXTENDED_PROFILES_JSON_PATH)
+
+            if profiles_path.exists():
+                with open(profiles_path, encoding="utf-8") as f:
+                    all_profiles = json.load(f)
+                    if user_id in all_profiles:
+                        profile_data = all_profiles[user_id]
+                        # profile_settingsからcustom_system_promptを取得
+                        if "profile_settings" in profile_data and isinstance(
+                            profile_data["profile_settings"], dict
+                        ):
+                            custom_prompt = profile_data["profile_settings"].get(
+                                "custom_system_prompt"
+                            )
+        except Exception as e:
+            logger.warning(f"カスタムプロンプトの読み取りに失敗: {e}")
+
+        if custom_prompt:
+            writer.writerow(["custom_system_prompt", custom_prompt.replace("\n", "\\n")])
+            writer.writerow(["using_custom_prompt", "true"])
+        else:
+            writer.writerow(["custom_system_prompt", ""])
+            writer.writerow(["using_custom_prompt", "false"])
+
+        # ユーザーコンテキスト
+        writer.writerow(["user_context", user_context.replace("\n", "\\n")])
+
+        # 会話履歴コンテキスト
+        writer.writerow(["conversation_context", conversation_context.replace("\n", "\\n")])
+
+        # システムプロンプト（パターン1）
+        writer.writerow(["system_prompt_pattern1", system_prompt_pattern1.replace("\n", "\\n")])
+
+        # システムプロンプト（パターン2）
+        writer.writerow(["system_prompt_pattern2", system_prompt_pattern2.replace("\n", "\\n")])
+
+        # システムプロンプト（パターン3）
+        writer.writerow(["system_prompt_pattern3", system_prompt_pattern3.replace("\n", "\\n")])
+
+        # モデル設定
+        user_model_settings = model_settings_storage.get(
+            user_id, {"model": "gpt-4.1-mini-2025-04-14", "temperature": 0.7, "max_tokens": 500}
+        )
+        writer.writerow(["model_settings", json.dumps(user_model_settings, ensure_ascii=False)])
+
+        # プロファイル詳細（JSON形式）
+        try:
+            if hasattr(extended_profile, "to_dict"):
+                profile_full_dict = extended_profile.to_dict()
+            else:
+                from dataclasses import asdict
+
+                profile_full_dict = asdict(extended_profile)
+            writer.writerow(["profile_full", json.dumps(profile_full_dict, ensure_ascii=False)])
+        except Exception as e:
+            logger.error(f"Error serializing profile_full: {e}")
+            writer.writerow(["profile_full", f"Error: {str(e)}"])
+
+        csv_content = output.getvalue()
+        output.close()
+
+        logger.info(f"CSV export completed successfully for {user_id}")
+
+        return {
+            "csv_data": csv_content,
+            "filename": f"prompt_debug_{user_id}_{datetime.now().strftime('%Y%m%d_%H%M%S')}.csv",
+        }
+
+    except Exception as e:
+        logger.error(f"Error in export_prompt_debug for {user_id}: {str(e)}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"Export failed: {str(e)}")
+
+
 @app.get("/api/export-profile/{user_id}")
 async def export_profile_csv(user_id: str):
     """Export user profile as JSON"""
     profile = extended_profile_system.get_profile(user_id)
 
     if not profile:
-        raise HTTPException(status_code=404, detail="User profile not found")
+        # プロファイルが存在しない場合は新規作成
+        from .extended_profile import ExtendedUserProfile
+
+        profile = ExtendedUserProfile(user_id=user_id)
+        extended_profile_system.create_or_update_profile(profile)
 
     # 拡張プロファイルを新しいJSON形式にマッピング
     # recent_concerns を work と mental に分類
@@ -1381,8 +1599,6 @@ modesに含まれるものを優先して使ってください：
 
 {user_context}
 
-{conversation_context}
-
 ## 回答方針
 response_pattern={response_pattern}に応じて以下のように応答してください：
 - pattern=1: 「はい」「なるほど」など短い相槌のみ（15文字以内）
@@ -1413,14 +1629,14 @@ async def get_model_settings(user_id: str):
         return model_settings_storage[user_id]
 
     # デフォルト設定
-    return {"model": "gpt-4o", "temperature": 0.7, "max_tokens": 500}
+    return {"model": "gpt-4.1-mini-2025-04-14", "temperature": 0.7, "max_tokens": 500}
 
 
 @app.post("/api/model-settings/{user_id}")
 async def update_model_settings(user_id: str, settings: dict[str, Any]):
     """ユーザーのGPTモデル設定を更新"""
     model_settings_storage[user_id] = {
-        "model": settings.get("model", "gpt-4o"),
+        "model": settings.get("model", "gpt-4.1-mini-2025-04-14"),
         "temperature": settings.get("temperature", 0.7),
         "max_tokens": settings.get("max_tokens", 500),
     }

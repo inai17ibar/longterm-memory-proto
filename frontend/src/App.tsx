@@ -182,7 +182,7 @@ function App() {
   const exportConversations = async () => {
     setIsExporting(true);
     try {
-      // 会話履歴、システムプロンプト、ユーザープロファイルの3つをダウンロード
+      // 会話履歴、システムプロンプト、プロンプトデバッグ、ユーザープロファイルの4つをダウンロード
       const endpoints = [
         {
           url: `${API_URL}/api/export-conversations/${userId}`,
@@ -192,6 +192,11 @@ function App() {
         {
           url: `${API_URL}/api/export-system-prompt/${userId}`,
           name: "システムプロンプト",
+          type: "text/csv",
+        },
+        {
+          url: `${API_URL}/api/export-prompt-debug/${userId}`,
+          name: "プロンプトデバッグ情報",
           type: "text/csv",
         },
         {
