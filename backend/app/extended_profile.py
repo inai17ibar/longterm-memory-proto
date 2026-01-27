@@ -494,11 +494,15 @@ class ExtendedProfileSystem:
         if profile.recent_concerns:
             summary_parts.append("\n## 現在の悩み・懸念")
             for category, concerns in profile.recent_concerns.items():
-                active_concerns = [c for c in concerns if c.status == "継続中"]
+                # 解決済み以外のすべての懸念を表示
+                active_concerns = [c for c in concerns if c.status not in ["解決済み", "resolved"]]
                 if active_concerns:
                     summary_parts.append(f"### {category}")
                     for concern in active_concerns[-3:]:  # カテゴリごとに最新3件
-                        summary_parts.append(f"  - {concern.summary}: {concern.details}")
+                        status_label = f"[{concern.status}]" if concern.status != "継続中" else ""
+                        summary_parts.append(
+                            f"  - {status_label}{concern.summary}: {concern.details}"
+                        )
 
         # 目標
         if profile.goals:
@@ -509,10 +513,74 @@ class ExtendedProfileSystem:
                 status_label = f"[{goal.status}]" if goal.status != "active" else ""
                 summary_parts.append(f"- [{goal.importance}]{status_label} {goal.goal}")
 
+        # 人間関係
+        if profile.relationships:
+            summary_parts.append("\n## 人間関係")
+            for rel_category, people in profile.relationships.items():
+                if people:
+                    summary_parts.append(f"### {rel_category}")
+                    for name, info in people.items():
+                        if isinstance(info, dict):
+                            context = info.get("context", "")
+                            role = info.get("role", "")
+                            desc = f"{role}: {context}" if role and context else role or context
+                            summary_parts.append(f"  - {name}: {desc}")
+                        else:
+                            summary_parts.append(f"  - {name}: {info}")
+
+        # 環境
+        if profile.environments:
+            summary_parts.append("\n## 環境・場所")
+            for env_key, env_value in profile.environments.items():
+                if env_value:
+                    # キーを日本語に変換
+                    key_translations = {
+                        "home_rest_spot": "自宅の休息場所",
+                        "walking_route": "散歩ルート",
+                        "favorite_cafe": "お気に入りのカフェ",
+                        "workplace": "職場",
+                    }
+                    key_label = key_translations.get(env_key, env_key)
+                    summary_parts.append(f"- {key_label}: {env_value}")
+
+        # 時間パターン
+        if profile.time_patterns:
+            summary_parts.append("\n## 時間・行動パターン")
+            for pattern in profile.time_patterns:
+                # 辞書型とオブジェクト型の両方に対応
+                if isinstance(pattern, dict):
+                    tendency = pattern.get("tendency", "")
+                    description = pattern.get("description", "")
+                else:
+                    tendency = getattr(pattern, "tendency", "")
+                    description = getattr(pattern, "description", "")
+
+                tendency_label = {
+                    "negative": "⚠️",
+                    "positive": "✓",
+                    "neutral": "・",
+                    "forget": "🔔",
+                }.get(tendency, "・")
+                summary_parts.append(f"- {tendency_label} {description}")
+
+        # 気分推移（最近の傾向）
+        if profile.mood_trend:
+            summary_parts.append("\n## 最近の気分推移")
+            # 最新5件を表示
+            for mood_entry in profile.mood_trend[-5:]:
+                # 辞書型とオブジェクト型の両方に対応
+                if isinstance(mood_entry, dict):
+                    mood = mood_entry.get("mood", "")
+                    intensity = mood_entry.get("intensity", "")
+                else:
+                    mood = getattr(mood_entry, "mood", "")
+                    intensity = getattr(mood_entry, "intensity", "")
+                summary_parts.append(f"- {mood} (強度: {intensity})")
+
         # 気分傾向
         tendency = profile.user_tendency
         if tendency.insight:
-            summary_parts.append("\n## 気分傾向")
+            summary_parts.append("\n## 気分傾向の分析")
             summary_parts.append(f"- {tendency.insight}")
             summary_parts.append(f"- 最近の主な気分: {tendency.dominant_mood}")
 
