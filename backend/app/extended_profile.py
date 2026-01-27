@@ -292,9 +292,16 @@ class ExtendedProfileSystem:
                 for user_id, user_data in data["users"].items():
                     self.profiles[user_id] = ExtendedUserProfile.from_dict(user_id, user_data)
 
-            print(f"Loaded {len(self.profiles)} extended profiles from {self.json_file_path}")
+            # print()ではなくloggerを使用（Windowsコンソールのエンコーディングエラーを回避）
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.info(f"Loaded {len(self.profiles)} extended profiles from {self.json_file_path}")
         except Exception as e:
-            print(f"Error loading extended profiles: {e}")
+            import logging
+
+            logger = logging.getLogger(__name__)
+            logger.error(f"Error loading extended profiles: {e}")
             self.profiles = {}
 
     def save_to_file(self):
@@ -398,6 +405,8 @@ class ExtendedProfileSystem:
 
     def generate_profile_summary(self, user_id: str) -> str:
         """プロファイル要約を生成（プロンプト用）"""
+        # JSONファイルから最新のプロファイルをリロード
+        self.load_from_file()
         profile = self.get_profile(user_id)
         if not profile:
             return "プロファイル情報がありません。"
@@ -494,9 +503,11 @@ class ExtendedProfileSystem:
         # 目標
         if profile.goals:
             summary_parts.append("\n## 目標")
-            active_goals = [g for g in profile.goals if g.status == "active"]
+            # completed以外のすべての目標を表示（active, in_progress, warning, stable等）
+            active_goals = [g for g in profile.goals if g.status != "completed"]
             for goal in active_goals[-5:]:  # 最新5件
-                summary_parts.append(f"- [{goal.importance}] {goal.goal}")
+                status_label = f"[{goal.status}]" if goal.status != "active" else ""
+                summary_parts.append(f"- [{goal.importance}]{status_label} {goal.goal}")
 
         # 気分傾向
         tendency = profile.user_tendency
