@@ -22,6 +22,7 @@ class ProfileSettings:
     ai_personality: str = "優しく寄り添うガイド"
     ai_expectation: str = "2"  # 1-3の期待レベル
     response_length_style: str = "medium"  # short/medium/long
+    custom_system_prompt: str | None = None  # カスタムシステムプロンプト
     profile_initialized_at: int = field(default_factory=lambda: int(datetime.now().timestamp()))
 
 
@@ -159,10 +160,6 @@ class ExtendedUserProfile:
             else:
                 result[key] = value
 
-        # profile_settingsからcustom_system_promptを除外（Noneまたは存在する場合）
-        if "profile_settings" in result and isinstance(result["profile_settings"], dict):
-            result["profile_settings"].pop("custom_system_prompt", None)
-
         return result
 
     def to_json(self, indent: int = 2) -> str:
@@ -177,8 +174,6 @@ class ExtendedUserProfile:
         # profile_settings
         if "profile_settings" in data:
             settings_data = data["profile_settings"].copy()
-            # custom_system_promptを除外
-            settings_data.pop("custom_system_prompt", None)
             profile.profile_settings = ProfileSettings(**settings_data)
 
         # general_profile

@@ -122,12 +122,14 @@ function App() {
         data.debug_logs.forEach(
           (log: { timestamp: string; level: string; message: string }) => {
             const logLevel = log.level.toLowerCase();
+            // エスケープされた改行文字を実際の改行に変換
+            const formattedMessage = log.message.replace(/\\n/g, "\n");
             if (logLevel === "error") {
-              console.error(`[${log.timestamp}]`, log.message);
+              console.error(`[${log.timestamp}]\n${formattedMessage}`);
             } else if (logLevel === "warning" || logLevel === "warn") {
-              console.warn(`[${log.timestamp}]`, log.message);
+              console.warn(`[${log.timestamp}]\n${formattedMessage}`);
             } else {
-              console.log(`[${log.timestamp}]`, log.message);
+              console.log(`[${log.timestamp}]\n${formattedMessage}`);
             }
           },
         );

@@ -252,31 +252,23 @@ def generate_system_prompt(
     # 拡張プロファイルから設定を取得
     ai_name = "カウンセラー"
     ai_personality = "優しく寄り添うガイド"
-    response_length_style = "medium"
+    custom_prompt = None
 
-    if extended_profile:
+    if extended_profile and extended_profile.profile_settings:
         settings = extended_profile.profile_settings
         ai_name = settings.ai_name
         ai_personality = settings.ai_personality
-        response_length_style = settings.response_length_style
+        custom_prompt = getattr(settings, "custom_system_prompt", None)
 
-    # カスタムプロンプト機能は削除されました
-    # if custom_prompt:
-    #     # カスタムプロンプトに変数を置換
-    #     prompt = custom_prompt
-    #     prompt = prompt.replace("{conversation_context}", conversation_context)
-    #     prompt = prompt.replace("{ai_name}", ai_name)
-    #     prompt = prompt.replace("{ai_personality}", ai_personality)
-    #     prompt = prompt.replace("{response_pattern}", str(response_pattern))
-    #     return prompt
-
-    # 応答スタイルに応じた文字数制限
-    length_limits = {
-        "short": {"pattern1": 15, "pattern2": 80, "pattern3": 150},
-        "medium": {"pattern1": 15, "pattern2": 100, "pattern3": 200},
-        "long": {"pattern1": 15, "pattern2": 150, "pattern3": 300},
-    }
-    limits = length_limits.get(response_length_style, length_limits["medium"])
+    # カスタムプロンプトが設定されている場合はそれを使用（response_patternによる分岐なし）
+    if custom_prompt:
+        # カスタムプロンプトに変数を置換
+        prompt = custom_prompt
+        prompt = prompt.replace("{conversation_context}", conversation_context)
+        prompt = prompt.replace("{ai_name}", ai_name)
+        prompt = prompt.replace("{ai_personality}", ai_personality)
+        # user_contextとresponse_patternはカスタムプロンプトでは使用されない想定
+        return prompt
 
     base_prompt = f"""あなたは{ai_name}という名前のAIメンタルカウンセラーです。
 あなたの性格・役割は「{ai_personality}」です。
@@ -314,48 +306,8 @@ modesに含まれるものを優先して使ってください：
 - 関連する専門知識がある場合は、それを自然に会話に織り込んでください（専門用語の押し付けは避ける）
 - プロファイルに記録された症状やストレス要因を踏まえて、個別化された応答を心がけてください
 
-{conversation_context}"""
-
-    if response_pattern == 1:
-        return (
-            base_prompt
-            + f"""
-
-## 回答方針（パターン1: 応答のみ）
-- ユーザーの話が途中で途切れており、続きがありそうな状況です
-- 「はい」「なるほど」「そうなんですね」「うんうん」「うん」など適切な相槌だけしてください
-- 特に質問をする必要はありません
-- {limits['pattern1']}文字以下で回答してください
-- ユーザーが話を続けやすい雰囲気を作ってください"""
-        )
-
-    elif response_pattern == 2:
-        return (
-            base_prompt
-            + f"""
-
-## 回答方針（パターン2: 傾聴）
-- 傾聴型で、ユーザーが気軽に話せるように質問してください
-- 共感が第一：「〜してくれてありがとう」「〜という気持ち、すごくわかります」
-- 評価しない・急がない：「〜すべき」「〜が悪い」は避け、ただ話を「受け止める」
-- 安心・安全の場づくり：「ここでは〜しても大丈夫」「一人じゃないです」
-- ポジティブもネガティブも尊重：「その報告うれしいです」「苦しい中でよく話してくれました」
-- {limits['pattern2']}文字以下で回答してください"""
-        )
-
-    else:  # pattern 3
-        return (
-            base_prompt
-            + f"""
-
-## 回答方針（パターン3: 解決策提案・客観的視点）
-- ユーザーが悩んで周りが見えなくなっている状況かもしれません
-- 客観的で冷静な視点を入れてあげてください
-- 客観的に、ユーザーの良さを見つけて褒めてください
-- 解決を急がず、ユーザーが安心して話せる感覚を持たせてください
-- 解決策の押し付けはせず、どんなことができそうか一緒に考える姿勢を持ってください
-- {limits['pattern3']}文字以下で回答してください"""
-        )
+"""
+    return base_prompt
 
 
 @app.get("/healthz")
@@ -624,6 +576,28 @@ async def chat_with_counselor(chat_message: ChatMessage):
             # メッセージ配列を表示
             logger.info("\n[Chat] Final prompt messages")
             logger.info(json.dumps(api_request["messages"], indent=2, ensure_ascii=False))
+
+            # システムプロンプトを個別にログ出力（ブラウザコンソールで確認しやすくするため）
+            if DEBUG_MODE:
+                # システムプロンプト全体を1つのログエントリにまとめる
+                system_prompt_log = f"""
+{'=' * 80}
+[SYSTEM PROMPT - FULL CONTENT]
+{'=' * 80}
+{system_prompt}
+{'=' * 80}
+"""
+                logger.info(system_prompt_log)
+
+                # ユーザーコンテキスト全体を1つのログエントリにまとめる
+                user_context_log = f"""
+{'=' * 80}
+[USER CONTEXT - FULL CONTENT]
+{'=' * 80}
+{user_context}
+{'=' * 80}
+"""
+                logger.info(user_context_log)
 
             # APIリクエストメタデータ
             logger.info("\n[OPENAI API REQUEST METADATA]")
@@ -1634,7 +1608,7 @@ async def get_default_system_prompt():
 - ユーザーにとって「ここでは自分らしくいられる」「居心地が良い」場所を提供してください
 
 ## 会話モード
-user_context内には「このターンで優先したいモード」が含まれます。
+ユーザーコンテキストメッセージ内には「このターンで優先したいモード」が含まれます。
 modesに含まれるものを優先して使ってください：
 
 - empathy: 共感・受容を前面に出し、「わかってもらえた感」を最優先にする
@@ -1652,22 +1626,21 @@ modesに含まれるものを優先して使ってください：
 - 記憶しているユーザの情報を会話の中で自然に活用してください
 - 適度に改行を入れて読みやすくしてください
 
-{user_context}
-
-## 回答方針
-response_pattern={response_pattern}に応じて以下のように応答してください：
-- pattern=1: 「はい」「なるほど」など短い相槌のみ（15文字以内）
-- pattern=2: 傾聴型で共感を示す応答（100文字程度）
-- pattern=3: 解決策提案・客観的視点を含む応答（200文字程度）"""
+重要指示:
+- 上記のプロファイル・記憶を会話の中で**能動的かつ自然に**活用してください
+- 「～さんは以前〇〇とおっしゃっていましたね」「～について頑張っていますね」のように、こちらから記憶を参照してください
+- ユーザーが「私の名前は？」と聞かなくても、適切なタイミングで記憶している情報を使って声をかけてください
+- 過去の悩みや目標の進捗を気にかけ、継続的なサポートを示してください
+- 関連する専門知識がある場合は、それを自然に会話に織り込んでください（専門用語の押し付けは避ける）
+- プロファイルに記録された症状やストレス要因を踏まえて、個別化された応答を心がけてください
+"""
 
     return {
         "default_prompt": default_prompt,
         "variables": [
             "{ai_name}",
             "{ai_personality}",
-            "{user_context}",
             "{conversation_context}",
-            "{response_pattern}",
         ],
         "description": "システムプロンプトテンプレート。変数は実行時に自動置換されます。",
     }
