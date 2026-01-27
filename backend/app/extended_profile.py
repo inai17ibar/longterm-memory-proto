@@ -304,7 +304,11 @@ class ExtendedProfileSystem:
         with open(self.json_file_path, "w", encoding="utf-8") as f:
             json.dump(data, f, ensure_ascii=False, indent=2)
 
-        print(f"Saved {len(self.profiles)} extended profiles to {self.json_file_path}")
+        # print()ではなくloggerを使用（Windowsコンソールのエンコーディングエラーを回避）
+        import logging
+
+        logger = logging.getLogger(__name__)
+        logger.info(f"Saved {len(self.profiles)} extended profiles to {self.json_file_path}")
 
     def get_profile(self, user_id: str) -> ExtendedUserProfile | None:
         """プロファイルを取得"""
